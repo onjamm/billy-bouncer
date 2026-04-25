@@ -114,6 +114,7 @@ The goal was not just "western colors," but a game that feels like somebody's ou
 - Tilt the phone left or right to steer Billy, in the same spirit as classic Doodle Jump motion controls
 - Tap to start
 - Tap the screen to shoot
+- On iPhone, motion access should be tested on the HTTPS deployment so the browser can grant sensor permission
 
 Billy handles jumping on his own. Your whole job is route choice, horizontal control, timing, and survival.
 

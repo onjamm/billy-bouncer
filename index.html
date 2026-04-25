@@ -122,6 +122,9 @@
       const TILT_SMOOTHING = 0.18;
       const TILT_BASELINE_LERP = 0.04;
       const TILT_MIN_INTENT = 0.08;
+      const TILT_ACCEL_DEAD_ZONE = 0.12;
+      const TILT_ACCEL_FULL_STEER = 2.2;
+      const TILT_SOURCE_TIMEOUT_MS = 450;
 
       const COLORS = {
         ink: 0x1C1208,
@@ -380,23 +383,60 @@
       }
 
       function supportsTiltControls() {
-        return typeof window !== "undefined" && typeof window.DeviceOrientationEvent !== "undefined";
+        return typeof window !== "undefined" && (typeof window.DeviceOrientationEvent !== "undefined" || typeof window.DeviceMotionEvent !== "undefined");
       }
 
-      async function requestTiltPermission() {
-        if (!supportsTiltControls()) {
+      function isMotionSecureContext() {
+        return typeof window !== "undefined" && !!window.isSecureContext;
+      }
+
+      function getScreenAngle() {
+        if (typeof window === "undefined") {
+          return 0;
+        }
+        if (window.screen && window.screen.orientation && typeof window.screen.orientation.angle === "number") {
+          return window.screen.orientation.angle;
+        }
+        if (typeof window.orientation === "number") {
+          return window.orientation;
+        }
+        return 0;
+      }
+
+      async function requestSensorPermission(sensorCtor) {
+        if (typeof sensorCtor === "undefined") {
           return false;
         }
-        const request = window.DeviceOrientationEvent.requestPermission;
+        const request = sensorCtor.requestPermission;
         if (typeof request === "function") {
           try {
-            const result = await request.call(window.DeviceOrientationEvent);
+            const result = await request.call(sensorCtor);
             return result === "granted";
           } catch (error) {
             return false;
           }
         }
         return true;
+      }
+
+      async function requestTiltPermission() {
+        if (!supportsTiltControls()) {
+          return false;
+        }
+
+        const needsPermission =
+          (typeof window.DeviceOrientationEvent !== "undefined" && typeof window.DeviceOrientationEvent.requestPermission === "function") ||
+          (typeof window.DeviceMotionEvent !== "undefined" && typeof window.DeviceMotionEvent.requestPermission === "function");
+
+        if (needsPermission && !isMotionSecureContext()) {
+          return false;
+        }
+
+        const results = await Promise.all([
+          requestSensorPermission(window.DeviceOrientationEvent),
+          requestSensorPermission(window.DeviceMotionEvent)
+        ]);
+        return results.some(Boolean);
       }
 
       // ============================================================
@@ -763,6 +803,9 @@
           const bestScore = Number(localStorage.getItem(BEST_SCORE_KEY) || 0);
           const centerX = GAME_W / 2;
           const touchTilt = isTouchDevice() && supportsTiltControls();
+          const controlsHintText = touchTilt
+            ? (isMotionSecureContext() ? "Phone: tilt to steer Billy left and right" : "Phone: tilt works on the HTTPS version")
+            : "Desktop: arrows or A / D to steer";
 
           this.titleShadow = this.add.text(centerX + 4, 132 + 4, "BILLY BOUNCER", {
             fontFamily: "Georgia, serif",
@@ -794,7 +837,7 @@
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#EEDAA8", 2).setShadow(0, 2, "rgba(28,18,8,0.16)", 0);
 
-          this.controlsHint = this.add.text(centerX, 660, touchTilt ? "Phone: tilt to steer Billy left and right" : "Desktop: arrows or A / D to steer", {
+          this.controlsHint = this.add.text(centerX, 660, controlsHintText, {
             fontFamily: "Georgia, serif",
             fontSize: "15px",
             fontStyle: "italic",
@@ -1422,57 +1465,132 @@
         setupMotionControls() {
           this.motion = {
             supported: supportsTiltControls(),
-            active: this.motionGranted || (supportsTiltControls() && typeof window.DeviceOrientationEvent.requestPermission !== "function"),
+            active: this.motionGranted || (supportsTiltControls() && typeof window.DeviceOrientationEvent.requestPermission !== "function" && typeof window.DeviceMotionEvent.requestPermission !== "function"),
+            orientationSupported: typeof window.DeviceOrientationEvent !== "undefined",
+            motionSupported: typeof window.DeviceMotionEvent !== "undefined",
+            permissionDenied: false
+          };
+          this.motion.orientation = {
             calibrated: false,
             baseline: 0,
-            rawGamma: 0,
+            raw: 0,
             intent: 0,
-            permissionDenied: false
+            lastAt: 0
+          };
+          this.motion.accel = {
+            calibrated: false,
+            baseline: 0,
+            raw: 0,
+            intent: 0,
+            lastAt: 0
           };
 
           if (!this.motion.supported) {
             return;
           }
 
+          this.applyMotionChannel = (channel, rawValue, deadZone, fullScale) => {
+            if (!Number.isFinite(rawValue)) {
+              return;
+            }
+
+            channel.raw = rawValue;
+            channel.lastAt = performance.now();
+
+            if (!channel.calibrated) {
+              channel.baseline = rawValue;
+              channel.intent = 0;
+              channel.calibrated = true;
+            } else if (Math.abs(channel.intent) < TILT_MIN_INTENT) {
+              channel.baseline = lerp(channel.baseline, rawValue, TILT_BASELINE_LERP);
+            }
+
+            const relative = rawValue - channel.baseline;
+            const absValue = Math.abs(relative);
+            const normalized = absValue <= deadZone ? 0 : clamp(relative / fullScale, -1, 1);
+            channel.intent = lerp(channel.intent, normalized, TILT_SMOOTHING);
+          };
+
           this.onDeviceOrientation = (event) => {
             if (!this.motion.active) {
               return;
             }
 
-            let gamma = typeof event.gamma === "number" ? event.gamma : null;
-            if (gamma === null && typeof event.beta === "number") {
-              gamma = event.beta;
+            const angle = getScreenAngle();
+            let horizontalTilt = null;
+
+            if (Math.abs(angle) === 90 || Math.abs(angle) === 270) {
+              if (typeof event.beta === "number") {
+                horizontalTilt = angle === 90 ? -event.beta : event.beta;
+              }
+            } else if (Math.abs(angle) === 180) {
+              if (typeof event.gamma === "number") {
+                horizontalTilt = -event.gamma;
+              }
+            } else if (typeof event.gamma === "number") {
+              horizontalTilt = event.gamma;
             }
-            if (gamma === null) {
+
+            if (horizontalTilt === null && typeof event.gamma === "number") {
+              horizontalTilt = event.gamma;
+            }
+            if (horizontalTilt === null && typeof event.beta === "number") {
+              horizontalTilt = event.beta;
+            }
+            if (horizontalTilt === null) {
               return;
             }
 
-            gamma = clamp(gamma, -45, 45);
-            this.motion.rawGamma = gamma;
+            horizontalTilt = clamp(horizontalTilt, -45, 45);
+            this.applyMotionChannel(this.motion.orientation, horizontalTilt, TILT_DEAD_ZONE, TILT_FULL_STEER);
+          };
 
-            if (!this.motion.calibrated) {
-              this.motion.baseline = gamma;
-              this.motion.intent = 0;
-              this.motion.calibrated = true;
-            } else if (Math.abs(this.motion.intent) < TILT_MIN_INTENT) {
-              this.motion.baseline = lerp(this.motion.baseline, gamma, TILT_BASELINE_LERP);
+          this.onDeviceMotion = (event) => {
+            if (!this.motion.active) {
+              return;
             }
 
-            const relativeGamma = gamma - this.motion.baseline;
-            const absGamma = Math.abs(relativeGamma);
-            const normalized = absGamma <= TILT_DEAD_ZONE ? 0 : clamp(relativeGamma / TILT_FULL_STEER, -1, 1);
-            this.motion.intent = lerp(this.motion.intent, normalized, TILT_SMOOTHING);
+            const acceleration = event.accelerationIncludingGravity || event.acceleration;
+            if (!acceleration) {
+              return;
+            }
+
+            let horizontalAccel = null;
+            const angle = getScreenAngle();
+            if (Math.abs(angle) === 90 || Math.abs(angle) === 270) {
+              if (typeof acceleration.y === "number") {
+                horizontalAccel = angle === 90 ? acceleration.y : -acceleration.y;
+              }
+            } else if (Math.abs(angle) === 180) {
+              if (typeof acceleration.x === "number") {
+                horizontalAccel = -acceleration.x;
+              }
+            } else if (typeof acceleration.x === "number") {
+              horizontalAccel = acceleration.x;
+            }
+
+            if (horizontalAccel === null && typeof acceleration.x === "number") {
+              horizontalAccel = acceleration.x;
+            }
+            if (horizontalAccel === null) {
+              return;
+            }
+
+            this.applyMotionChannel(this.motion.accel, horizontalAccel, TILT_ACCEL_DEAD_ZONE, TILT_ACCEL_FULL_STEER);
           };
 
           this.onOrientationChange = () => {
             if (!this.motion) {
               return;
             }
-            this.motion.calibrated = false;
-            this.motion.intent = 0;
+            this.motion.orientation.calibrated = false;
+            this.motion.orientation.intent = 0;
+            this.motion.accel.calibrated = false;
+            this.motion.accel.intent = 0;
           };
 
           window.addEventListener("deviceorientation", this.onDeviceOrientation);
+          window.addEventListener("devicemotion", this.onDeviceMotion);
           window.addEventListener("orientationchange", this.onOrientationChange);
         }
 
@@ -1486,8 +1604,12 @@
           this.motion.permissionDenied = !granted;
 
           if (granted) {
-            this.motion.calibrated = false;
-            this.motion.intent = 0;
+            this.motion.orientation.calibrated = false;
+            this.motion.orientation.intent = 0;
+            this.motion.orientation.lastAt = 0;
+            this.motion.accel.calibrated = false;
+            this.motion.accel.intent = 0;
+            this.motion.accel.lastAt = 0;
           }
 
           return granted;
@@ -1497,7 +1619,23 @@
           if (!this.motion || !this.motion.active) {
             return 0;
           }
-          return Math.abs(this.motion.intent) < TILT_MIN_INTENT ? 0 : clamp(this.motion.intent, -1, 1);
+
+          const now = performance.now();
+          const orientationFresh = now - this.motion.orientation.lastAt < TILT_SOURCE_TIMEOUT_MS;
+          const accelFresh = now - this.motion.accel.lastAt < TILT_SOURCE_TIMEOUT_MS;
+          const orientationIntent = orientationFresh ? this.motion.orientation.intent : 0;
+          const accelIntent = accelFresh ? this.motion.accel.intent : 0;
+
+          let combined = 0;
+          if (orientationFresh && accelFresh) {
+            combined = Math.abs(orientationIntent) >= Math.abs(accelIntent) ? orientationIntent : accelIntent;
+          } else if (orientationFresh) {
+            combined = orientationIntent;
+          } else if (accelFresh) {
+            combined = accelIntent;
+          }
+
+          return Math.abs(combined) < TILT_MIN_INTENT ? 0 : clamp(combined, -1, 1);
         }
 
         updatePlayerControl(time) {
@@ -2215,6 +2353,9 @@
           }
           if (this.onDeviceOrientation) {
             window.removeEventListener("deviceorientation", this.onDeviceOrientation);
+          }
+          if (this.onDeviceMotion) {
+            window.removeEventListener("devicemotion", this.onDeviceMotion);
           }
           if (this.onOrientationChange) {
             window.removeEventListener("orientationchange", this.onOrientationChange);
