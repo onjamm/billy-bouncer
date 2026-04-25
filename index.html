@@ -18,6 +18,21 @@
       display: block;
       margin: 0 auto;
     }
+
+    .motion-permission-btn {
+      position: fixed;
+      z-index: 40;
+      border: 3px solid #1C1208;
+      background: #F4E4BC;
+      color: #1C1208;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 18px;
+      font-weight: bold;
+      padding: 12px 20px;
+      box-shadow: 4px 4px 0 rgba(184, 48, 32, 0.42);
+      letter-spacing: 0;
+      touch-action: manipulation;
+    }
   </style>
 </head>
 <body>
@@ -386,6 +401,13 @@
         return typeof window !== "undefined" && (typeof window.DeviceOrientationEvent !== "undefined" || typeof window.DeviceMotionEvent !== "undefined");
       }
 
+      function needsExplicitTiltPermission() {
+        return typeof window !== "undefined" && (
+          (typeof window.DeviceMotionEvent !== "undefined" && typeof window.DeviceMotionEvent.requestPermission === "function") ||
+          (typeof window.DeviceOrientationEvent !== "undefined" && typeof window.DeviceOrientationEvent.requestPermission === "function")
+        );
+      }
+
       function isMotionSecureContext() {
         return typeof window !== "undefined" && !!window.isSecureContext;
       }
@@ -424,19 +446,22 @@
           return false;
         }
 
-        const needsPermission =
-          (typeof window.DeviceOrientationEvent !== "undefined" && typeof window.DeviceOrientationEvent.requestPermission === "function") ||
-          (typeof window.DeviceMotionEvent !== "undefined" && typeof window.DeviceMotionEvent.requestPermission === "function");
-
-        if (needsPermission && !isMotionSecureContext()) {
+        if (needsExplicitTiltPermission() && !isMotionSecureContext()) {
           return false;
         }
 
-        const results = await Promise.all([
-          requestSensorPermission(window.DeviceOrientationEvent),
-          requestSensorPermission(window.DeviceMotionEvent)
-        ]);
-        return results.some(Boolean);
+        if (typeof window.DeviceMotionEvent !== "undefined" && typeof window.DeviceMotionEvent.requestPermission === "function") {
+          const granted = await requestSensorPermission(window.DeviceMotionEvent);
+          if (granted) {
+            return true;
+          }
+        }
+
+        if (typeof window.DeviceOrientationEvent !== "undefined" && typeof window.DeviceOrientationEvent.requestPermission === "function") {
+          return requestSensorPermission(window.DeviceOrientationEvent);
+        }
+
+        return true;
       }
 
       // ============================================================
@@ -799,12 +824,15 @@
           this.bg = this.add.graphics().setScrollFactor(0);
           this.preview = this.add.graphics();
           this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
+          this.starting = false;
 
           const bestScore = Number(localStorage.getItem(BEST_SCORE_KEY) || 0);
           const centerX = GAME_W / 2;
           const touchTilt = isTouchDevice() && supportsTiltControls();
+          const secureTilt = touchTilt && isMotionSecureContext();
+          const explicitTiltPermission = touchTilt && needsExplicitTiltPermission();
           const controlsHintText = touchTilt
-            ? (isMotionSecureContext() ? "Phone: tilt to steer Billy left and right" : "Phone: tilt works on the HTTPS version")
+            ? (secureTilt ? (explicitTiltPermission ? "Phone: tap ENABLE TILT, then tilt to steer" : "Phone: tilt to steer Billy left and right") : "Phone: tilt works on the HTTPS version")
             : "Desktop: arrows or A / D to steer";
 
           this.titleShadow = this.add.text(centerX + 4, 132 + 4, "BILLY BOUNCER", {
@@ -852,11 +880,72 @@
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setShadow(0, 1, "rgba(28,18,8,0.12)", 0);
 
           this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-          this.input.once("pointerdown", () => this.startGame());
+          if (!explicitTiltPermission || !secureTilt) {
+            this.onMenuPointerDown = () => {
+              void this.startGame();
+            };
+            this.input.once("pointerdown", this.onMenuPointerDown);
+          }
           this.input.keyboard.once("keydown-SPACE", () => this.startGame());
+
+          if (explicitTiltPermission && secureTilt) {
+            this.createMotionButton();
+          }
+        }
+
+        createMotionButton() {
+          this.motionButton = document.createElement("button");
+          this.motionButton.className = "motion-permission-btn";
+          this.motionButton.textContent = "ENABLE TILT";
+          this.motionButton.setAttribute("type", "button");
+
+          this.positionMotionButton = () => {
+            if (!this.motionButton || !this.game || !this.game.canvas) {
+              return;
+            }
+            const rect = this.game.canvas.getBoundingClientRect();
+            this.motionButton.style.left = `${rect.left + rect.width / 2 - 98}px`;
+            this.motionButton.style.top = `${rect.top + rect.height * 0.73}px`;
+            this.motionButton.style.width = "196px";
+          };
+
+          this.onMotionButtonPress = async (event) => {
+            if (event && event.cancelable) {
+              event.preventDefault();
+            }
+            if (this.motionButtonBusy) {
+              return;
+            }
+            this.motionButtonBusy = true;
+            const granted = await requestTiltPermission();
+            if (granted) {
+              this.controlsHint.setText("Tilt unlocked - steer by turning your phone");
+              void this.startGame(true);
+            } else {
+              this.controlsHint.setText("Tilt permission was denied - allow motion access and try again");
+              this.motionButtonBusy = false;
+            }
+          };
+
+          this.motionButton.addEventListener("touchend", this.onMotionButtonPress, { passive: false });
+          this.motionButton.addEventListener("click", this.onMotionButtonPress);
+          document.body.appendChild(this.motionButton);
+          this.positionMotionButton();
+          window.addEventListener("resize", this.positionMotionButton);
         }
 
         shutdown() {
+          if (this.onMenuPointerDown) {
+            this.input.off("pointerdown", this.onMenuPointerDown);
+          }
+          if (this.motionButton) {
+            this.motionButton.removeEventListener("touchend", this.onMotionButtonPress);
+            this.motionButton.removeEventListener("click", this.onMotionButtonPress);
+            this.motionButton.remove();
+          }
+          if (this.positionMotionButton) {
+            window.removeEventListener("resize", this.positionMotionButton);
+          }
           [
             this.bg,
             this.preview,
@@ -875,9 +964,13 @@
           this.preview = null;
         }
 
-        async startGame() {
+        async startGame(forceMotionGranted) {
+          if (this.starting) {
+            return;
+          }
+          this.starting = true;
           this.audio.unlock();
-          const motionGranted = await requestTiltPermission();
+          const motionGranted = typeof forceMotionGranted === "boolean" ? forceMotionGranted : await requestTiltPermission();
           this.scene.start("game", {
             motionGranted
           });
@@ -1465,7 +1558,7 @@
         setupMotionControls() {
           this.motion = {
             supported: supportsTiltControls(),
-            active: this.motionGranted || (supportsTiltControls() && typeof window.DeviceOrientationEvent.requestPermission !== "function" && typeof window.DeviceMotionEvent.requestPermission !== "function"),
+            active: this.motionGranted || (supportsTiltControls() && !needsExplicitTiltPermission()),
             orientationSupported: typeof window.DeviceOrientationEvent !== "undefined",
             motionSupported: typeof window.DeviceMotionEvent !== "undefined",
             permissionDenied: false
