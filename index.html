@@ -1163,6 +1163,7 @@
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#F4E4BC", 2);
+          const rideHit = this.add.zone(cx, RIDE_AGAIN_Y, GAME_OVER_BUTTON_W, GAME_OVER_BUTTON_H).setInteractive({ useHandCursor: true });
 
           const saloonBox = this.add.rectangle(cx, SALOON_Y, GAME_OVER_BUTTON_W, GAME_OVER_BUTTON_H, COLORS.parchment, 1).setStrokeStyle(4, COLORS.ink);
           const saloonText = this.add.text(cx, SALOON_Y, "SALOON", {
@@ -1171,12 +1172,30 @@
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#F4E4BC", 2);
+          const saloonHit = this.add.zone(cx, SALOON_Y, GAME_OVER_BUTTON_W, GAME_OVER_BUTTON_H).setInteractive({ useHandCursor: true });
 
-          this.overlay.add([dim, gonerShadow, goner, line, this.finalScore, rideBox, rideText, saloonBox, saloonText]);
+          const activateRideAgain = () => {
+            if (!this.overlay || !this.overlay.visible || this.overlay.alpha < 0.9) {
+              return;
+            }
+            this.scene.restart();
+          };
+          const activateSaloon = () => {
+            if (!this.overlay || !this.overlay.visible || this.overlay.alpha < 0.9) {
+              return;
+            }
+            this.scene.start("menu");
+          };
+
+          rideHit.on("pointerup", activateRideAgain);
+          saloonHit.on("pointerup", activateSaloon);
+
+          this.overlay.add([dim, gonerShadow, goner, line, this.finalScore, rideBox, rideText, saloonBox, saloonText, rideHit, saloonHit]);
           this.overlayButtons = {
             ride: { x: cx, y: RIDE_AGAIN_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H },
             saloon: { x: cx, y: SALOON_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H }
           };
+          this.overlayHitAreas = { rideHit, saloonHit };
         }
 
         handleOverlayPointer(pointer) {
