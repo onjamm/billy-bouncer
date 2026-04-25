@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Billy Bouncer</title>
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23F4E4BC'/%3E%3Cg transform='translate(5 4) scale(2.25)'%3E%3Cpath fill='%231C1208' d='M20 22H4V20C4 17.8 7.6 16 12 16S20 17.8 20 20M8 9H16V10C16 12.2 14.2 14 12 14S8 12.2 8 10M19 4C18.4 4 18 4.4 18 5V6H16.5L15.1 3C15 2.8 14.9 2.6 14.7 2.5C14.2 2 13.4 1.9 12.7 2.2L12 2.4L11.3 2.1C10.6 1.8 9.8 1.9 9.3 2.4C9.1 2.6 9 2.8 8.9 3L7.5 6H6V5C6 4.4 5.6 4 5 4S4 4.4 4 5V6C4 7.1 4.9 8 6 8H18C19.1 8 20 7.1 20 6V5C20 4.5 19.6 4 19 4Z'/%3E%3C/g%3E%3C/svg%3E"
+  />
   <style>
     html, body {
       margin: 0;
@@ -109,6 +114,11 @@
       const JETPACK_MS = 3000;
       const ROCKET_MS = 1500;
       const PROPELLER_MS = 1800;
+      const OPENING_PLATFORM_COUNT = 12;
+      const OPENING_PLATFORM_PATTERN = ["normal", "movingH", "normal", "movingH", "normal", "movingH", "normal", "movingH", "normal", "movingH", "normal"];
+      const OPENING_GAP_MIN = 92;
+      const OPENING_GAP_MAX = 120;
+      const OPENING_CHALLENGE_ALTITUDE = 1350;
       const GAME_OVER_BUTTON_W = 220;
       const GAME_OVER_BUTTON_H = 58;
       const RIDE_AGAIN_Y = 492;
@@ -120,7 +130,7 @@
       const EARLY_X_CHALLENGE = 0.38;
       const LATE_X_CHALLENGE = 0.72;
       const MIN_SPAWN_X_OFFSET = 18;
-      const SAFE_OPENING_ALTITUDE = 650;
+      const SAFE_OPENING_ALTITUDE = 540;
       const SAFE_ENEMY_START_ALTITUDE = 900;
       const SAFE_BLACK_HOLE_START_ALTITUDE = 2200;
       const PLAYFIELD_MIN_X = PLATFORM_EDGE_PADDING;
@@ -206,7 +216,7 @@
           ceiling: 1000,
           weights: { normal: 80, movingH: 10, fragile: 5 },
           springChance: 0.05,
-          gapMin: 78,
+          gapMin: 82,
           gapMax: 112
         },
         {
@@ -777,14 +787,71 @@
           const lanternY = [110, 230, 360, 510, 660];
           lanternY.forEach((y, index) => {
             const x = index % 2 === 0 ? 28 : GAME_W - 28;
-            for (let r = 46; r >= 12; r -= 10) {
-              g.fillStyle(COLORS.gold, lanternAlpha * (r === 12 ? 0.35 : 0.04 * (48 - r)));
-              g.fillCircle(x, y + Math.sin(time * 0.002 + index) * 3, r);
-            }
-            g.fillStyle(COLORS.oldBrass, lanternAlpha * 0.9);
-            g.fillCircle(x, y, 5);
-            g.lineStyle(2, COLORS.ink, lanternAlpha * 0.75);
-            g.strokeCircle(x, y, 5);
+            const sway = Math.sin(time * 0.002 + index) * 3;
+            const bodyY = y + sway;
+            const frameX = index % 2 === 0 ? x + 8 : x - 8;
+            const chainX = frameX;
+
+            g.lineStyle(2, COLORS.ink, lanternAlpha * 0.55);
+            g.beginPath();
+            g.moveTo(chainX, bodyY - 34);
+            g.lineTo(chainX, bodyY - 22);
+            g.strokePath();
+            g.beginPath();
+            g.moveTo(chainX - 4, bodyY - 34);
+            g.lineTo(chainX + 4, bodyY - 34);
+            g.strokePath();
+
+            g.fillStyle(COLORS.oldBrass, lanternAlpha * 0.95);
+            g.fillRect(frameX - 9, bodyY - 16, 18, 24);
+            g.lineStyle(3, COLORS.ink, lanternAlpha * 0.85);
+            g.strokeRect(frameX - 9, bodyY - 16, 18, 24);
+
+            g.fillStyle(COLORS.gold, lanternAlpha * 0.55);
+            g.fillRect(frameX - 6, bodyY - 11, 12, 14);
+            g.fillStyle(COLORS.gold, lanternAlpha * 0.22);
+            g.fillTriangle(frameX - 7, bodyY + 10, frameX + 7, bodyY + 10, frameX, bodyY + 24);
+            g.fillStyle(COLORS.gold, lanternAlpha * 0.12);
+            g.fillTriangle(frameX - 11, bodyY + 10, frameX + 11, bodyY + 10, frameX, bodyY + 31);
+            g.lineStyle(2, COLORS.ink, lanternAlpha * 0.3);
+            g.beginPath();
+            g.moveTo(frameX, bodyY - 11);
+            g.lineTo(frameX, bodyY + 3);
+            g.strokePath();
+            g.beginPath();
+            g.moveTo(frameX - 6, bodyY - 4);
+            g.lineTo(frameX + 6, bodyY - 4);
+            g.strokePath();
+
+            g.lineStyle(2, COLORS.ink, lanternAlpha * 0.8);
+            g.beginPath();
+            g.moveTo(frameX - 5, bodyY - 16);
+            g.lineTo(frameX, bodyY - 22);
+            g.lineTo(frameX + 5, bodyY - 16);
+            g.strokePath();
+            g.beginPath();
+            g.moveTo(frameX - 4, bodyY + 8);
+            g.lineTo(frameX, bodyY + 13);
+            g.lineTo(frameX + 4, bodyY + 8);
+            g.strokePath();
+
+            g.lineStyle(2, COLORS.gold, lanternAlpha * 0.24);
+            g.beginPath();
+            g.moveTo(frameX - 12, bodyY - 3);
+            g.lineTo(frameX - 18, bodyY - 3);
+            g.strokePath();
+            g.beginPath();
+            g.moveTo(frameX + 12, bodyY - 3);
+            g.lineTo(frameX + 18, bodyY - 3);
+            g.strokePath();
+            g.beginPath();
+            g.moveTo(frameX - 10, bodyY + 6);
+            g.lineTo(frameX - 15, bodyY + 10);
+            g.strokePath();
+            g.beginPath();
+            g.moveTo(frameX + 10, bodyY + 6);
+            g.lineTo(frameX + 15, bodyY + 10);
+            g.strokePath();
           });
         }
 
@@ -1120,6 +1187,7 @@
           this.topSpawnY = START_PLATFORM_Y;
           this.lastPlatformX = GAME_W / 2;
           this.lastSpawnPlatform = null;
+          this.generatedPlatforms = 0;
 
           this.platforms = [];
           this.pickups = [];
@@ -1477,6 +1545,7 @@
         seedWorld() {
           const startPlatform = this.createPlatform(GAME_W / 2, START_PLATFORM_Y, "normal", PLATFORM_W + 30, true);
           this.platforms.push(startPlatform);
+          this.generatedPlatforms = 1;
           this.topSpawnY = START_PLATFORM_Y;
           this.lastSpawnPlatform = startPlatform;
           this.lastPlatformX = startPlatform.x;
@@ -1616,19 +1685,27 @@
           const anchor = this.getSpawnAnchor() || { x: GAME_W / 2, y: START_PLATFORM_Y, w: PLATFORM_W + 30 };
           const altitude = Math.max(0, START_Y - anchor.y);
           const band = this.getAltitudeBand(altitude);
-          const gapCap = Math.min(band.gapMax, this.getSafeGapCap(altitude));
-          const gap = Phaser.Math.Between(band.gapMin, gapCap);
+          const openingKickoff = this.generatedPlatforms < OPENING_PLATFORM_COUNT;
+          const gapMin = openingKickoff ? OPENING_GAP_MIN : band.gapMin;
+          const gapCap = openingKickoff
+            ? OPENING_GAP_MAX
+            : Math.min(band.gapMax, this.getSafeGapCap(altitude));
+          const gap = Phaser.Math.Between(gapMin, gapCap);
           const nextY = anchor.y - gap;
 
-          const type = altitude < SAFE_OPENING_ALTITUDE
-            ? (Math.random() < 0.85 ? "normal" : "movingH")
+          const type = openingKickoff
+            ? OPENING_PLATFORM_PATTERN[Math.min(OPENING_PLATFORM_PATTERN.length - 1, this.generatedPlatforms - 1)]
+            : altitude < SAFE_OPENING_ALTITUDE
+            ? (Math.random() < 0.76 ? "normal" : "movingH")
             : chooseWeighted(band.weights);
           const width = PLATFORM_W + Phaser.Math.Between(-10, 18);
-          const x = this.chooseReachablePlatformX(anchor, width, gap, altitude);
+          const challengeAltitude = openingKickoff ? OPENING_CHALLENGE_ALTITUDE : altitude;
+          const x = this.chooseReachablePlatformX(anchor, width, gap, challengeAltitude);
           const platform = this.createPlatform(x, nextY, type, width, false);
           this.topSpawnY = nextY;
           this.lastPlatformX = x;
           this.lastSpawnPlatform = platform;
+          this.generatedPlatforms += 1;
 
           if (type === "normal" && Math.random() < band.springChance) {
             platform.spring = {
@@ -1678,7 +1755,17 @@
           if (platform.safe || Math.random() > map(altitude, 0, 7000, 0.08, 0.13)) {
             return;
           }
-          const type = chooseWeighted(POWERUP_WEIGHTS);
+          const powerupWeights = platform.spring
+            ? {
+                jetpack: POWERUP_WEIGHTS.jetpack,
+                rocket: POWERUP_WEIGHTS.rocket,
+                propeller: POWERUP_WEIGHTS.propeller,
+                boots: POWERUP_WEIGHTS.boots,
+                shield: POWERUP_WEIGHTS.shield,
+                repellent: POWERUP_WEIGHTS.repellent
+              }
+            : POWERUP_WEIGHTS;
+          const type = chooseWeighted(powerupWeights);
           this.pickups.push({
             id: this.idCounter++,
             type,
@@ -1700,6 +1787,7 @@
             id: this.idCounter++,
             type,
             dead: false,
+            stompPending: false,
             damaged: false,
             hitFlashUntil: 0,
             platform: null,
@@ -2312,7 +2400,16 @@
               }
             }
 
-            if (!enemy.dead && this.isInUpdateBand(enemy.y, UPDATE_MARGIN_TOP + 60, UPDATE_MARGIN_BOTTOM + 100)) {
+            if (!enemy.dead && enemy.stompPending) {
+              const playerAboveEnemy = this.player.body.velocity.y < 0 && this.player.y + PLAYER_BODY_H / 2 < enemy.y - enemy.h / 2 - 6;
+              if (playerAboveEnemy) {
+                enemy.dead = true;
+                enemy.stompPending = false;
+                this.audio.enemyDeath();
+                this.spawnBurst(enemy.x, enemy.y, this.getEnemyColor(enemy), 5);
+                this.activatePoofText(enemy.x, enemy.y - 16);
+              }
+            } else if (!enemy.dead && this.isInUpdateBand(enemy.y, UPDATE_MARGIN_TOP + 60, UPDATE_MARGIN_BOTTOM + 100)) {
               const platform = enemy.platform;
               if (enemy.type === "snake" && platform) {
                 enemy.y = platform.y - 18 + Math.sin(time * 0.004 + enemy.bobPhase) * 4;
@@ -2384,6 +2481,14 @@
           }
         }
 
+        stompEnemy(enemy, enemyTop) {
+          enemy.stompPending = true;
+          enemy.beamActive = false;
+          enemy.beamCharge = 0;
+          enemy.hitFlashUntil = this.time.now + 120;
+          this.applyBounce(JUMP_VELOCITY, enemyTop);
+        }
+
         checkEnemyCollisions() {
           if (this.gameOverShown) {
             return;
@@ -2396,10 +2501,13 @@
           const propellerActive = this.time.now < this.playerState.propellerUntil;
 
           const prevBottom = (this.prevPlayerY ?? this.player.y) + PLAYER_BODY_H / 2;
+          const playerBottom = this.player.y + PLAYER_BODY_H / 2;
+          const playerLeft = this.player.x - PLAYER_BODY_W / 2;
+          const playerRight = this.player.x + PLAYER_BODY_W / 2;
           const playerRect = { x: this.player.x, y: this.player.y, w: PLAYER_BODY_W, h: PLAYER_BODY_H };
 
           for (const enemy of this.enemies) {
-            if (enemy.dead) {
+            if (enemy.dead || enemy.stompPending) {
               continue;
             }
 
@@ -2414,11 +2522,23 @@
             }
 
             const enemyTop = enemy.y - enemy.h / 2;
-            const fallingOnTop = this.player.body.velocity.y > 0 && prevBottom <= enemyTop + STOMP_TOLERANCE && this.player.y < enemy.y;
+            const enemyLeft = enemy.x - enemy.w / 2;
+            const enemyRight = enemy.x + enemy.w / 2;
+            const topOverlap = Math.min(playerRight, enemyRight) - Math.max(playerLeft, enemyLeft);
+            const touchingEnemyTop =
+              topOverlap > 0 &&
+              prevBottom <= enemyTop + STOMP_TOLERANCE &&
+              playerBottom >= enemyTop - 2;
+            const fallingOnTop = this.player.body.velocity.y > 0 && touchingEnemyTop;
 
             if (fallingOnTop) {
-              this.damageEnemy(enemy, 1);
-              this.applyBounce(JUMP_VELOCITY, enemyTop);
+              this.stompEnemy(enemy, enemyTop);
+              return;
+            }
+
+            if (this.playerState.shield) {
+              this.damageEnemy(enemy, enemy.hp);
+              this.consumeShield(enemy.x, enemy.y);
               return;
             }
 
@@ -2990,16 +3110,8 @@
 
         if (platform.spring) {
           const springX = platform.x + platform.spring.xOffset;
-          g.lineStyle(3, COLORS.gold, 1);
           const top = platform.y - platform.h / 2 - 1;
-          for (let i = 0; i < 4; i += 1) {
-            const y = top - i * 4;
-            g.beginPath();
-            g.moveTo(springX - 6, y);
-            g.lineTo(springX, y - 2);
-            g.lineTo(springX + 6, y);
-            g.strokePath();
-          }
+          drawSpringShape(g, springX, top - 8, 0.9);
         }
       }
 
@@ -3029,10 +3141,30 @@
         };
 
         if (state.shield) {
-          for (let r = 34; r >= 18; r -= 8) {
-            g.lineStyle(3, COLORS.white, 0.04 + r * 0.003);
-            g.strokeCircle(x, y, r * avgScale);
-          }
+          const pulse = 1 + Math.sin(time * 0.008) * 0.035;
+          const shellW = 74 * avgScale * pulse;
+          const shellH = 92 * avgScale * (1 - Math.sin(time * 0.008) * 0.02);
+          const shellY = y - 2 * avgScale;
+          g.fillStyle(0x64A0DC, 0.12);
+          g.fillEllipse(x, shellY, shellW, shellH);
+          g.lineStyle(3, 0xFFFFFF, 0.34);
+          g.strokeEllipse(x, shellY, shellW, shellH);
+          g.lineStyle(2, 0x64A0DC, 0.65);
+          g.strokeEllipse(x, shellY, shellW - 6 * avgScale, shellH - 8 * avgScale);
+
+          const glintOffset = Math.sin(time * 0.01) * 2;
+          g.lineStyle(3, 0xFFFFFF, 0.42);
+          g.beginPath();
+          g.moveTo(x - 17 * avgScale, shellY - 23 * avgScale + glintOffset);
+          g.lineTo(x - 8 * avgScale, shellY - 31 * avgScale + glintOffset);
+          g.lineTo(x + 2 * avgScale, shellY - 26 * avgScale + glintOffset);
+          g.strokePath();
+
+          g.lineStyle(2, 0xFFFFFF, 0.24);
+          g.beginPath();
+          g.moveTo(x + 12 * avgScale, shellY + 18 * avgScale);
+          g.lineTo(x + 20 * avgScale, shellY + 11 * avgScale);
+          g.strokePath();
         }
 
         if (state.jetpack) {
@@ -3390,17 +3522,40 @@
         }
       }
 
+      function drawSpringShape(g, x, y, scale = 1) {
+        const w = 14 * scale;
+        const h = 18 * scale;
+        const topY = y - h / 2;
+        const bottomY = y + h / 2;
+
+        g.fillStyle(COLORS.gold, 1);
+        g.fillRect(x - 10 * scale, topY - 4 * scale, 20 * scale, 5 * scale);
+        g.lineStyle(3, COLORS.ink, 1);
+        g.strokeRect(x - 10 * scale, topY - 4 * scale, 20 * scale, 5 * scale);
+
+        g.lineStyle(3, COLORS.gold, 1);
+        for (let i = 0; i < 4; i += 1) {
+          const t0 = i / 4;
+          const t1 = (i + 1) / 4;
+          const y0 = Phaser.Math.Linear(topY, bottomY, t0);
+          const y1 = Phaser.Math.Linear(topY, bottomY, t1);
+          g.beginPath();
+          g.moveTo(x - w / 2, y0);
+          g.lineTo(x + w / 2, (y0 + y1) / 2);
+          g.lineTo(x - w / 2, y1);
+          g.strokePath();
+        }
+
+        g.lineStyle(2, COLORS.oldBrass, 0.9);
+        g.beginPath();
+        g.moveTo(x + w / 2, topY + 1 * scale);
+        g.lineTo(x + w / 2, bottomY - 1 * scale);
+        g.strokePath();
+      }
+
       function drawPickup(g, pickup) {
         if (pickup.type === "spring") {
-          g.lineStyle(3, COLORS.gold, 1);
-          for (let i = 0; i < 4; i += 1) {
-            const y = pickup.y + 8 - i * 4;
-            g.beginPath();
-            g.moveTo(pickup.x - 8, y);
-            g.lineTo(pickup.x, y - 2);
-            g.lineTo(pickup.x + 8, y);
-            g.strokePath();
-          }
+          drawSpringShape(g, pickup.x, pickup.y + 1, 1);
         } else if (pickup.type === "jetpack") {
           g.fillStyle(COLORS.oldBrass, 1);
           g.fillRect(pickup.x - 10, pickup.y - 12, 20, 24);
