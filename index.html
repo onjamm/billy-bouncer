@@ -48,8 +48,8 @@
       const GAME_H = 800;
       const HUD_X = 18;
       const GRAVITY = 1400;
-      const CAMERA_FOLLOW_OFFSET = 300;
-      const CAMERA_SMOOTH = 0.18;
+      const CAMERA_FOLLOW_OFFSET = 284;
+      const CAMERA_SMOOTH = 0.24;
       const START_Y = 700;
       const START_PLATFORM_Y = 744;
       const PLATFORM_H = 16;
@@ -72,7 +72,7 @@
       const PICKUP_SPRING_VELOCITY = -1600;
       const ROCKET_VELOCITY = -2200;
       const JETPACK_VELOCITY = -320;
-      const PROPELLER_LIFT_VELOCITY = -250;
+      const PROPELLER_LIFT_VELOCITY = -375;
       const BOOTS_VELOCITY = -1360;
       const BOOTS_BOUNCES = 6;
       const PELLET_SPEED = 980;
@@ -134,12 +134,17 @@
       const PLATFORM_LANDING_STRIP = 42;
       const TILT_DEAD_ZONE = 2.5;
       const TILT_FULL_STEER = 28;
-      const TILT_SMOOTHING = 0.18;
+      const TILT_SMOOTHING_GAIN = 0.24;
+      const TILT_SMOOTHING_RELEASE = 0.12;
       const TILT_BASELINE_LERP = 0.04;
       const TILT_MIN_INTENT = 0.08;
       const TILT_ACCEL_DEAD_ZONE = 0.12;
       const TILT_ACCEL_FULL_STEER = 2.2;
       const TILT_SOURCE_TIMEOUT_MS = 450;
+      const UPDATE_MARGIN_TOP = 120;
+      const UPDATE_MARGIN_BOTTOM = 180;
+      const RENDER_MARGIN_TOP = 96;
+      const RENDER_MARGIN_BOTTOM = 120;
 
       const COLORS = {
         ink: 0x1C1208,
@@ -239,6 +244,34 @@
 
       const ENEMY_WEIGHTS_LOW = { snake: 48, vulture: 22, heavy: 18, ufo: 12 };
       const ENEMY_WEIGHTS_HIGH = { snake: 20, vulture: 25, heavy: 26, ufo: 29 };
+      const GOONER_LINES = [
+        "The law caught up eventually...",
+        "Billy zigged when he should've zagged.",
+        "That bounty just got easier to collect.",
+        "The trail ran cold, then off a cliff.",
+        "Even outlaws miss a landing now and then.",
+        "That escape plan needed one more plank.",
+        "The frontier kept the receipt.",
+        "A rough ride turned into a short one.",
+        "That escape turned into a cautionary tale.",
+        "The wanted poster just got more accurate.",
+        "Billy met the business end of bad luck.",
+        "Somewhere, a sheriff nodded knowingly.",
+        "That jump looked better on paper.",
+        "The canyon keeps what it catches.",
+        "A bold climb, a questionable ending.",
+        "Turns out gravity still works out here.",
+        "The saloon will hear about this one.",
+        "That swagger outran Billy's boots.",
+        "Accidental justice still counts, sadly.",
+        "Billy picked the one route marked nope.",
+        "That landing had bar-fight grace.",
+        "The posse won't need to break a sweat.",
+        "A clean getaway became a messy footnote.",
+        "The desert called. Billy answered badly.",
+        "Somewhere up there, a platform laughed.",
+        "A fine time to discover consequences."
+      ];
 
       // ============================================================
       // Utility helpers
@@ -658,55 +691,60 @@
         return COLORS.indigo;
       }
 
-      function drawSketchbookBackground(scene, g, altitude, scrollY, time) {
-        const cactusAlpha = 1 - getThemeAlpha(altitude, 1000, 1200);
-        const mesaAlpha = clamp(getThemeAlpha(altitude, 900, 1200) - getThemeAlpha(altitude, 3000, 3200), 0, 1);
-        const lanternAlpha = clamp(getThemeAlpha(altitude, 2900, 3200) - getThemeAlpha(altitude, 5000, 5200), 0, 1);
-        const starsAlpha = getThemeAlpha(altitude, 4900, 5200);
-        const tumbleX = ((time * 0.06) % (GAME_W + 80)) - 40;
-        const lineOffset = ((scrollY * 0.2) % 28 + 28) % 28;
-
+      function drawBackgroundBase(g, baseColor) {
         g.clear();
-        g.fillStyle(getThemeBaseColor(altitude), 1);
+        g.fillStyle(baseColor, 1);
         g.fillRect(0, 0, GAME_W, GAME_H);
-
         g.lineStyle(1, 0x8B6538, 0.07);
-        for (let y = -lineOffset; y < GAME_H + 28; y += 28) {
+        for (let y = 0; y < GAME_H + 28; y += 28) {
           g.beginPath();
           g.moveTo(0, y);
           g.lineTo(GAME_W, y);
           g.strokePath();
         }
-
         g.lineStyle(2, 0xB45028, 0.18);
         g.beginPath();
         g.moveTo(58, 0);
         g.lineTo(58, GAME_H);
         g.strokePath();
+      }
 
-        if (cactusAlpha > 0.01) {
-          const parallax = (scrollY * 0.12) % 120;
-          g.fillStyle(COLORS.cactus, cactusAlpha * 0.9);
-          const cactusPositions = [46, 134, 238, 338, 426];
-          cactusPositions.forEach((x, i) => {
-            const baseY = GAME_H - 64 - (i % 2) * 22 + parallax * 0.1;
-            g.fillRect(x, baseY - 52, 14, 52);
-            g.fillRect(x - 10, baseY - 32, 10, 12);
-            g.fillRect(x + 14, baseY - 22, 10, 12);
-          });
-          g.lineStyle(3, COLORS.ink, cactusAlpha * 0.85);
-          cactusPositions.forEach((x, i) => {
-            const baseY = GAME_H - 64 - (i % 2) * 22 + parallax * 0.1;
-            g.strokeRect(x, baseY - 52, 14, 52);
-          });
-
-          g.lineStyle(3, COLORS.cactus, cactusAlpha * 0.7);
-          g.strokeCircle(tumbleX, GAME_H * 0.55 + Math.sin(time * 0.002) * 12, 18);
-          g.beginPath();
-          g.moveTo(tumbleX - 14, GAME_H * 0.55 + 2);
-          g.lineTo(tumbleX + 14, GAME_H * 0.55 - 4);
-          g.strokePath();
+      function getBackgroundBaseBlend(altitude) {
+        if (altitude < 1000) {
+          return { primary: "parchment", secondary: null, alpha: 0 };
         }
+        if (altitude < 1000 + THEME_BLEND) {
+          return { primary: "parchment", secondary: "mesa", alpha: (altitude - 1000) / THEME_BLEND };
+        }
+        if (altitude < 3000) {
+          return { primary: "mesa", secondary: null, alpha: 0 };
+        }
+        if (altitude < 3000 + THEME_BLEND) {
+          return { primary: "mesa", secondary: "night", alpha: (altitude - 3000) / THEME_BLEND };
+        }
+        if (altitude < 5000) {
+          return { primary: "night", secondary: null, alpha: 0 };
+        }
+        if (altitude < 5000 + THEME_BLEND) {
+          return { primary: "night", secondary: "indigo", alpha: (altitude - 5000) / THEME_BLEND };
+        }
+        return { primary: "indigo", secondary: null, alpha: 0 };
+      }
+
+      function drawSketchbookBackground(scene, g, altitude, scrollY, time) {
+        const mesaAlpha = clamp(getThemeAlpha(altitude, 900, 1200) - getThemeAlpha(altitude, 3000, 3200), 0, 1);
+        const lanternAlpha = clamp(getThemeAlpha(altitude, 2900, 3200) - getThemeAlpha(altitude, 5000, 5200), 0, 1);
+        const starsAlpha = getThemeAlpha(altitude, 4900, 5200);
+        const tumbleX = ((time * 0.06) % (GAME_W + 80)) - 40;
+
+        g.clear();
+
+        g.lineStyle(3, COLORS.cactus, 0.22);
+        g.strokeCircle(tumbleX, GAME_H * 0.55 + Math.sin(time * 0.002) * 12, 18);
+        g.beginPath();
+        g.moveTo(tumbleX - 14, GAME_H * 0.55 + 2);
+        g.lineTo(tumbleX + 14, GAME_H * 0.55 - 4);
+        g.strokePath();
 
         if (mesaAlpha > 0.01) {
           const offset = (scrollY * 0.06) % 180;
@@ -799,14 +837,6 @@
         g.beginPath();
         g.moveTo(58, 0);
         g.lineTo(58, GAME_H);
-        g.strokePath();
-
-        const stampAlpha = 0.18 + Math.sin(time * 0.0018) * 0.06;
-        g.lineStyle(3, COLORS.cactus, stampAlpha);
-        g.strokeCircle(38, 388, 16);
-        g.beginPath();
-        g.moveTo(26, 386);
-        g.lineTo(50, 382);
         g.strokePath();
       }
 
@@ -987,6 +1017,7 @@
           const previewState = {
             x: centerX,
             y: banditY,
+            vx: Math.sin((time / MENU_BOUNCE_PERIOD) * Math.PI) * 120,
             vy: Math.cos((time / MENU_BOUNCE_PERIOD) * Math.PI) * 420,
             dir: 1,
             scaleX: 1,
@@ -1035,6 +1066,9 @@
           this.physics.world.gravity.y = GRAVITY;
 
           // Major render layers
+          this.createRenderCaches();
+          this.bgBase = this.add.image(GAME_W / 2, GAME_H / 2, this.backgroundBaseKeys.parchment).setScrollFactor(0).setDepth(-30);
+          this.bgBlend = this.add.image(GAME_W / 2, GAME_H / 2, this.backgroundBaseKeys.parchment).setScrollFactor(0).setDepth(-29).setVisible(false).setAlpha(0);
           this.bg = this.add.graphics().setScrollFactor(0).setDepth(-20);
           this.worldLayer = this.add.graphics().setDepth(10);
           this.uiLayer = this.add.graphics().setScrollFactor(0).setDepth(100);
@@ -1046,7 +1080,7 @@
 
           // Input
           this.cursors = this.input.keyboard.createCursorKeys();
-          this.keys = this.input.keyboard.addKeys("A,D,SPACE");
+          this.keys = this.input.keyboard.addKeys("A,D,SPACE,ENTER");
           this.onPointerDown = (pointer) => {
             void this.ensureMotionPermission();
             if (this.gameOverShown) {
@@ -1080,7 +1114,6 @@
           };
 
           this.highestY = this.player.y;
-          this.collectScore = 0;
           this.bestScore = Number(localStorage.getItem(BEST_SCORE_KEY) || 0);
           this.lastShotAt = -SHOT_COOLDOWN;
           this.gameOverShown = false;
@@ -1090,7 +1123,6 @@
 
           this.platforms = [];
           this.pickups = [];
-          this.collectibles = [];
           this.enemies = [];
           this.blackHoles = [];
           this.pellets = [];
@@ -1110,6 +1142,220 @@
 
         hasSpringInvincibility(time = this.time.now) {
           return this.playerState.springBoostActive || time < this.playerState.invincibleUntil;
+        }
+
+        hasPowerupInvincibility(time = this.time.now) {
+          return (
+            this.hasSpringInvincibility(time) ||
+            time < this.playerState.jetpackUntil ||
+            time < this.playerState.rocketUntil ||
+            time < this.playerState.propellerUntil ||
+            this.playerState.springBoots > 0 ||
+            time < this.playerState.repellentUntil
+          );
+        }
+
+        createRenderCaches() {
+          this.textureBuilder = this.make.graphics({ add: false });
+          this.staticSpritePool = [];
+          this.staticTextureKeys = new Set();
+          this.backgroundBaseKeys = {
+            parchment: "bg-base-parchment",
+            mesa: "bg-base-mesa",
+            night: "bg-base-night",
+            indigo: "bg-base-indigo"
+          };
+          const backgroundColors = {
+            parchment: COLORS.parchment,
+            mesa: 0xD8B38E,
+            night: COLORS.nightBrown,
+            indigo: COLORS.indigo
+          };
+
+          Object.entries(this.backgroundBaseKeys).forEach(([name, key]) => {
+            if (this.textures.exists(key)) {
+              return;
+            }
+            drawBackgroundBase(this.textureBuilder, backgroundColors[name]);
+            this.textureBuilder.generateTexture(key, GAME_W, GAME_H);
+          });
+          this.textureBuilder.clear();
+        }
+
+        getViewportBounds(topMargin = 0, bottomMargin = 0) {
+          return {
+            top: this.cameras.main.scrollY - topMargin,
+            bottom: this.cameras.main.scrollY + GAME_H + bottomMargin
+          };
+        }
+
+        isInUpdateBand(y, topMargin = UPDATE_MARGIN_TOP, bottomMargin = UPDATE_MARGIN_BOTTOM) {
+          const bounds = this.getViewportBounds(topMargin, bottomMargin);
+          return y >= bounds.top && y <= bounds.bottom;
+        }
+
+        isInRenderBand(y, topMargin = RENDER_MARGIN_TOP, bottomMargin = RENDER_MARGIN_BOTTOM) {
+          const bounds = this.getViewportBounds(topMargin, bottomMargin);
+          return y >= bounds.top && y <= bounds.bottom;
+        }
+
+        acquireStaticSprite(textureKey) {
+          const sprite = this.staticSpritePool.pop() || this.add.image(0, 0, textureKey).setOrigin(0.5).setDepth(6);
+          sprite.setTexture(textureKey);
+          sprite.setVisible(true);
+          return sprite;
+        }
+
+        releaseStaticSprite(sprite) {
+          if (!sprite) {
+            return;
+          }
+          sprite.setVisible(false);
+          sprite.x = -9999;
+          sprite.y = -9999;
+          this.staticSpritePool.push(sprite);
+        }
+
+        releaseEntitySprite(entity) {
+          if (!entity || !entity.sprite) {
+            return;
+          }
+          this.releaseStaticSprite(entity.sprite);
+          entity.sprite = null;
+        }
+
+        isPlatformSpriteCacheable(platform) {
+          return platform.type === "normal" || platform.type === "movingV" || platform.type === "fragile";
+        }
+
+        getPlatformTextureKey(platform) {
+          return `platform-${platform.type}-${platform.w}-${platform.spring ? 1 : 0}-${platform.variant}`;
+        }
+
+        ensurePlatformTexture(platform) {
+          const key = this.getPlatformTextureKey(platform);
+          if (this.staticTextureKeys.has(key) || this.textures.exists(key)) {
+            this.staticTextureKeys.add(key);
+            return key;
+          }
+
+          const textureW = platform.w + 32;
+          const textureH = platform.spring ? 52 : 36;
+          const centerX = textureW / 2;
+          const centerY = textureH / 2 + (platform.spring ? 6 : 2);
+          const noise = platform.noise.map((point) => ({
+            x: centerX + (point.x - platform.x),
+            y: centerY + (point.y - platform.y)
+          }));
+
+          const fakePlatform = {
+            x: centerX,
+            y: centerY,
+            baseX: centerX,
+            baseY: centerY,
+            w: platform.w,
+            h: platform.h,
+            type: platform.type,
+            noise,
+            grainOffsets: platform.grainOffsets.slice(),
+            nails: platform.nails.slice(),
+            spring: platform.spring ? { xOffset: platform.spring.xOffset } : null,
+            dir: 1,
+            shakeUntil: 0,
+            hiddenUntil: 0,
+            explodeAt: 0,
+            exploded: false
+          };
+
+          this.textureBuilder.clear();
+          drawPlatform(this.textureBuilder, fakePlatform, 0);
+          this.textureBuilder.generateTexture(key, textureW, textureH);
+          this.textureBuilder.clear();
+          this.staticTextureKeys.add(key);
+          return key;
+        }
+
+        ensurePickupTexture(type) {
+          const key = `pickup-${type}`;
+          if (this.staticTextureKeys.has(key) || this.textures.exists(key)) {
+            this.staticTextureKeys.add(key);
+            return key;
+          }
+
+          const size = 44;
+          this.textureBuilder.clear();
+          drawPickup(this.textureBuilder, {
+            type,
+            x: size / 2,
+            y: size / 2,
+            bobPhase: 0,
+            baseY: size / 2
+          });
+          this.textureBuilder.generateTexture(key, size, size);
+          this.textureBuilder.clear();
+          this.staticTextureKeys.add(key);
+          return key;
+        }
+
+        syncPlatformSprite(platform, time) {
+          if (!this.isPlatformSpriteCacheable(platform)) {
+            this.releaseEntitySprite(platform);
+            return false;
+          }
+
+          const visible = platform.visible && !platform.exploded && this.isInRenderBand(platform.y);
+          if (!visible) {
+            if (platform.sprite) {
+              platform.sprite.setVisible(false);
+            }
+            return true;
+          }
+
+          const key = this.ensurePlatformTexture(platform);
+          if (!platform.sprite) {
+            platform.sprite = this.acquireStaticSprite(key);
+          } else if (platform.sprite.texture.key !== key) {
+            platform.sprite.setTexture(key);
+          }
+
+          const wobbleX = platform.shakeUntil > time ? Math.sin(time * 0.05) * 3 : 0;
+          platform.sprite.setPosition(platform.x + wobbleX, platform.y);
+          platform.sprite.setVisible(true);
+          platform.sprite.setAlpha(1);
+          return true;
+        }
+
+        syncPickupSprite(pickup) {
+          const visible = this.isInRenderBand(pickup.y);
+          if (!visible) {
+            if (pickup.sprite) {
+              pickup.sprite.setVisible(false);
+            }
+            return;
+          }
+
+          const key = this.ensurePickupTexture(pickup.type);
+          if (!pickup.sprite) {
+            pickup.sprite = this.acquireStaticSprite(key);
+          } else if (pickup.sprite.texture.key !== key) {
+            pickup.sprite.setTexture(key);
+          }
+
+          pickup.sprite.setPosition(pickup.x, pickup.y);
+          pickup.sprite.setVisible(true);
+        }
+
+        updateBackgroundBase(altitude) {
+          const blend = getBackgroundBaseBlend(altitude);
+          this.bgBase.setTexture(this.backgroundBaseKeys[blend.primary]);
+          if (blend.secondary) {
+            this.bgBlend.setTexture(this.backgroundBaseKeys[blend.secondary]);
+            this.bgBlend.setAlpha(blend.alpha);
+            this.bgBlend.setVisible(true);
+          } else {
+            this.bgBlend.setVisible(false);
+            this.bgBlend.setAlpha(0);
+          }
         }
 
         // ------------------------------------------------------------
@@ -1143,7 +1389,7 @@
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5);
-          const line = this.add.text(cx, 322, "The law caught up eventually...", {
+          this.gameOverLine = this.add.text(cx, 322, GOONER_LINES[0], {
             fontFamily: "Georgia, serif",
             fontSize: "24px",
             fontStyle: "italic",
@@ -1190,12 +1436,24 @@
           rideHit.on("pointerup", activateRideAgain);
           saloonHit.on("pointerup", activateSaloon);
 
-          this.overlay.add([dim, gonerShadow, goner, line, this.finalScore, rideBox, rideText, saloonBox, saloonText, rideHit, saloonHit]);
+          this.overlay.add([dim, gonerShadow, goner, this.gameOverLine, this.finalScore, rideBox, rideText, saloonBox, saloonText, rideHit, saloonHit]);
           this.overlayButtons = {
             ride: { x: cx, y: RIDE_AGAIN_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H },
             saloon: { x: cx, y: SALOON_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H }
           };
           this.overlayHitAreas = { rideHit, saloonHit };
+        }
+
+        getRandomGameOverLine() {
+          if (GOONER_LINES.length === 1) {
+            return GOONER_LINES[0];
+          }
+          let index = Phaser.Math.Between(0, GOONER_LINES.length - 1);
+          if (index === this.lastGameOverLineIndex) {
+            index = (index + 1 + Phaser.Math.Between(0, GOONER_LINES.length - 2)) % GOONER_LINES.length;
+          }
+          this.lastGameOverLineIndex = index;
+          return GOONER_LINES[index];
         }
 
         handleOverlayPointer(pointer) {
@@ -1269,19 +1527,27 @@
         }
 
         canSpawnEnemyCandidate(enemy, platform, altitude) {
-          const aliveEnemies = this.enemies.filter((other) => !other.dead);
-          if (aliveEnemies.length >= this.getEnemyScreenCap(altitude)) {
+          let aliveCount = 0;
+          for (const other of this.enemies) {
+            if (!other.dead) {
+              aliveCount += 1;
+            }
+          }
+          if (aliveCount >= this.getEnemyScreenCap(altitude)) {
             return false;
           }
 
           const laneDistance = Math.abs(shortestWrappedDelta(platform.x, enemy.x));
-          const requiredLane = enemy.platformId ? PLATFORM_LANDING_STRIP / 2 + enemy.w / 2 : ENEMY_SAFE_LANE_WIDTH / 2 + enemy.w / 2;
+          const requiredLane = enemy.platform ? PLATFORM_LANDING_STRIP / 2 + enemy.w / 2 : ENEMY_SAFE_LANE_WIDTH / 2 + enemy.w / 2;
           if (laneDistance < requiredLane) {
             return false;
           }
 
           let sameBandCount = 0;
-          for (const other of aliveEnemies) {
+          for (const other of this.enemies) {
+            if (other.dead) {
+              continue;
+            }
             const verticalDistance = Math.abs(other.y - enemy.y);
             if (verticalDistance > ENEMY_BAND_SPACING) {
               continue;
@@ -1371,7 +1637,6 @@
           }
 
           this.platforms.push(platform);
-          this.maybeSpawnCollectible(platform, altitude);
           this.maybeSpawnPowerup(platform, altitude);
           this.maybeSpawnEnemy(platform, altitude);
           this.maybeSpawnBlackHole(platform, altitude);
@@ -1390,6 +1655,7 @@
             noise: noisyBox(x, y, width, PLATFORM_H, 2),
             grainOffsets: [Phaser.Math.Between(-5, -1), Phaser.Math.Between(1, 5), Phaser.Math.Between(6, 10)],
             nails: [Phaser.Math.Between(-34, -22), Phaser.Math.Between(20, 34)],
+            variant: Phaser.Math.Between(0, 2),
             dir: Math.random() > 0.5 ? 1 : -1,
             speed: PLATFORM_MOVING_SPEED,
             phase: Math.random() * Math.PI * 2,
@@ -1406,24 +1672,6 @@
             shakeUntil: 0
           };
           return platform;
-        }
-
-        maybeSpawnCollectible(platform, altitude) {
-          if (platform.safe || Math.random() > 0.42) {
-            return;
-          }
-          const type = Math.random() < 0.8 ? "gold" : "silver";
-          this.collectibles.push({
-            id: this.idCounter++,
-            type,
-            value: type === "gold" ? 10 : 50,
-            x: platform.x + Phaser.Math.Between(-34, 34),
-            y: platform.y - Phaser.Math.Between(28, 40),
-            baseY: platform.y - Phaser.Math.Between(28, 40),
-            bobPhase: Math.random() * Math.PI * 2,
-            w: type === "gold" ? 14 : 18,
-            h: type === "gold" ? 14 : 18
-          });
         }
 
         maybeSpawnPowerup(platform, altitude) {
@@ -1454,7 +1702,7 @@
             dead: false,
             damaged: false,
             hitFlashUntil: 0,
-            platformId: null,
+            platform: null,
             baseY: platform.y,
             bobPhase: Math.random() * Math.PI * 2,
             beamCharge: 0,
@@ -1474,7 +1722,7 @@
             enemy.w = SNAKE_W;
             enemy.h = SNAKE_H;
             enemy.hp = 1;
-            enemy.platformId = platform.id;
+            enemy.platform = platform;
           } else if (type === "heavy") {
             const spawnX = this.choosePlatformEnemyX(platform, HEAVY_W);
             if (spawnX === null) {
@@ -1485,7 +1733,7 @@
             enemy.w = HEAVY_W;
             enemy.h = HEAVY_H;
             enemy.hp = 2;
-            enemy.platformId = platform.id;
+            enemy.platform = platform;
           } else if (type === "vulture") {
             const spawnX = this.chooseAirEnemyX(platform, VULTURE_W);
             if (spawnX === null) {
@@ -1549,7 +1797,6 @@
           this.updatePellets(dt);
           this.checkPlatformLandings(time);
           this.checkPickupCollects(time);
-          this.checkCollectibleCollects();
           this.checkEnemyCollisions(time);
           this.checkShotInput(time);
           this.cleanupWorld();
@@ -1620,7 +1867,8 @@
             const relative = rawValue - channel.baseline;
             const absValue = Math.abs(relative);
             const normalized = absValue <= deadZone ? 0 : clamp(relative / fullScale, -1, 1);
-            channel.intent = lerp(channel.intent, normalized, TILT_SMOOTHING);
+            const growing = Math.abs(normalized) > Math.abs(channel.intent);
+            channel.intent = lerp(channel.intent, normalized, growing ? TILT_SMOOTHING_GAIN : TILT_SMOOTHING_RELEASE);
           };
 
           this.onDeviceOrientation = (event) => {
@@ -1808,7 +2056,7 @@
             this.player.x = -PLAYER_WRAP_MARGIN;
           }
 
-          this.playerState.flashActive = time < this.playerState.flashUntil || (this.hasSpringInvincibility(time) && Math.floor(time / 90) % 2 === 0);
+          this.playerState.flashActive = time < this.playerState.flashUntil;
         }
 
         stretchLanding() {
@@ -1883,7 +2131,7 @@
 
         updateScore() {
           const height = Math.max(0, Math.floor(START_Y - this.highestY));
-          this.score = height + this.collectScore;
+          this.score = height;
           this.heightOnly = height;
         }
 
@@ -1988,19 +2236,23 @@
         // ------------------------------------------------------------
         updatePickupsAndCollectibles(time) {
           for (const pickup of this.pickups) {
+            if (!this.isInUpdateBand(pickup.y)) {
+              continue;
+            }
             pickup.y = pickup.baseY + Math.sin(time * PICKUP_BOB_SPEED + pickup.bobPhase) * 6;
-          }
-          for (const item of this.collectibles) {
-            item.y = item.baseY + Math.sin(time * COIN_BOB_SPEED + item.bobPhase) * 5;
           }
         }
 
         checkPickupCollects(time) {
           const playerHit = { x: this.player.x, y: this.player.y, w: PLAYER_BODY_W, h: PLAYER_BODY_H };
-          this.pickups = this.pickups.filter((pickup) => {
+          let write = 0;
+          for (let i = 0; i < this.pickups.length; i += 1) {
+            const pickup = this.pickups[i];
             const hit = rectsOverlap(playerHit, { x: pickup.x, y: pickup.y, w: 28, h: 28 });
             if (!hit) {
-              return true;
+              this.pickups[write] = pickup;
+              write += 1;
+              continue;
             }
 
             this.playerState.flashUntil = time + 90;
@@ -2024,28 +2276,9 @@
               this.playerState.repellentUntil = time + REPellent_MS;
               this.scareOffEnemies();
             }
-
-            return false;
-          });
-        }
-
-        checkCollectibleCollects() {
-          const playerHit = { x: this.player.x, y: this.player.y, w: PLAYER_BODY_W, h: PLAYER_BODY_H };
-          this.collectibles = this.collectibles.filter((item) => {
-            const hit = rectsOverlap(playerHit, item);
-            if (!hit) {
-              return true;
-            }
-
-            this.collectScore += item.value;
-            if (item.type === "gold") {
-              this.audio.collectGold();
-            } else {
-              this.audio.collectSilver();
-            }
-            this.spawnBurst(item.x, item.y, item.type === "gold" ? COLORS.gold : COLORS.silver, 5);
-            return false;
-          });
+            this.releaseEntitySprite(pickup);
+          }
+          this.pickups.length = write;
         }
 
         activatePoofText(x, y) {
@@ -2069,66 +2302,75 @@
         // Enemy logic and collisions
         // ------------------------------------------------------------
         updateEnemies(time, dt) {
-          for (const enemy of this.enemies) {
-            if (enemy.dead) {
-              continue;
-            }
-
-            const platform = enemy.platformId ? this.platforms.find((p) => p.id === enemy.platformId) : null;
-            if (enemy.platformId && (!platform || !platform.visible || platform.exploded || platform.falling)) {
-              enemy.dead = true;
-              continue;
-            }
-
-            if (enemy.type === "snake" && platform) {
-              enemy.y = platform.y - 18 + Math.sin(time * 0.004 + enemy.bobPhase) * 4;
-            } else if (enemy.type === "heavy" && platform) {
-              const previousX = enemy.x;
-              enemy.y = platform.y - 24;
-              enemy.x += enemy.dir * HEAVY_SPEED * dt;
-              const minX = platform.x - platform.w / 2 + 18;
-              const maxX = platform.x + platform.w / 2 - 18;
-              if (enemy.x < minX || enemy.x > maxX) {
-                enemy.dir *= -1;
-                enemy.x = clamp(enemy.x, minX, maxX);
+          let write = 0;
+          for (let i = 0; i < this.enemies.length; i += 1) {
+            const enemy = this.enemies[i];
+            if (!enemy.dead) {
+              const platform = enemy.platform;
+              if (platform && (!platform.visible || platform.exploded || platform.falling)) {
+                enemy.dead = true;
               }
-              enemy.stepDistance += Math.abs(enemy.x - previousX);
-              if (enemy.stepDistance >= 30) {
-                enemy.stepDistance = 0;
-                enemy.stepIndex += 1;
-                if (enemy.stepIndex % 2 === 0) {
-                  this.cameras.main.shake(80, 0.006);
+            }
+
+            if (!enemy.dead && this.isInUpdateBand(enemy.y, UPDATE_MARGIN_TOP + 60, UPDATE_MARGIN_BOTTOM + 100)) {
+              const platform = enemy.platform;
+              if (enemy.type === "snake" && platform) {
+                enemy.y = platform.y - 18 + Math.sin(time * 0.004 + enemy.bobPhase) * 4;
+              } else if (enemy.type === "heavy" && platform) {
+                const previousX = enemy.x;
+                enemy.y = platform.y - 24;
+                enemy.x += enemy.dir * HEAVY_SPEED * dt;
+                const minX = platform.x - platform.w / 2 + 18;
+                const maxX = platform.x + platform.w / 2 - 18;
+                if (enemy.x < minX || enemy.x > maxX) {
+                  enemy.dir *= -1;
+                  enemy.x = clamp(enemy.x, minX, maxX);
+                }
+                enemy.stepDistance += Math.abs(enemy.x - previousX);
+                if (enemy.stepDistance >= 30) {
+                  enemy.stepDistance = 0;
+                  enemy.stepIndex += 1;
+                  if (enemy.stepIndex % 2 === 0) {
+                    this.cameras.main.shake(80, 0.006);
+                  }
+                }
+              } else if (enemy.type === "vulture") {
+                enemy.x += enemy.dir * VULTURE_SPEED * dt;
+                enemy.y = enemy.baseY + Math.sin(time * 0.003 + enemy.bobPhase) * 10;
+                if (enemy.x < 34 || enemy.x > GAME_W - 34) {
+                  enemy.dir *= -1;
+                }
+              } else if (enemy.type === "ufo") {
+                enemy.x += enemy.dir * 80 * dt;
+                enemy.y = enemy.baseY + Math.sin(time * 0.002 + enemy.bobPhase) * 8;
+                if (enemy.x < 40 || enemy.x > GAME_W - 40) {
+                  enemy.dir *= -1;
+                }
+
+                const inBeam =
+                  Math.abs(this.player.x - enemy.x) <= Ufo_BEAM_WIDTH / 2 &&
+                  this.player.y > enemy.y &&
+                  this.player.y < enemy.y + Ufo_BEAM_HEIGHT &&
+                  !this.gameOverShown;
+
+                const beamBlocked = this.hasPowerupInvincibility(time) || this.playerState.shield;
+                enemy.beamActive = inBeam && !beamBlocked;
+                enemy.beamCharge = enemy.beamActive ? enemy.beamCharge + this.game.loop.delta : 0;
+                if (enemy.beamCharge >= Ufo_ABDUCT_MS && !this.playerState.abducting) {
+                  this.playerState.abducting = true;
+                  this.playerState.abductionEnemy = enemy;
                 }
               }
-            } else if (enemy.type === "vulture") {
-              enemy.x += enemy.dir * VULTURE_SPEED * dt;
-              enemy.y = enemy.baseY + Math.sin(time * 0.003 + enemy.bobPhase) * 10;
-              if (enemy.x < 34 || enemy.x > GAME_W - 34) {
-                enemy.dir *= -1;
-              }
-            } else if (enemy.type === "ufo") {
-              enemy.x += enemy.dir * 80 * dt;
-              enemy.y = enemy.baseY + Math.sin(time * 0.002 + enemy.bobPhase) * 8;
-              if (enemy.x < 40 || enemy.x > GAME_W - 40) {
-                enemy.dir *= -1;
-              }
+            }
 
-              const inBeam =
-                Math.abs(this.player.x - enemy.x) <= Ufo_BEAM_WIDTH / 2 &&
-                this.player.y > enemy.y &&
-                this.player.y < enemy.y + Ufo_BEAM_HEIGHT &&
-                !this.gameOverShown;
-
-              enemy.beamActive = inBeam;
-              enemy.beamCharge = inBeam ? enemy.beamCharge + this.game.loop.delta : 0;
-              if (enemy.beamCharge >= Ufo_ABDUCT_MS && !this.playerState.abducting) {
-                this.playerState.abducting = true;
-                this.playerState.abductionEnemy = enemy;
-              }
+            if (!enemy.dead || enemy.fadeUntil > time) {
+              this.enemies[write] = enemy;
+              write += 1;
+            } else {
+              this.releaseEntitySprite(enemy);
             }
           }
-
-          this.enemies = this.enemies.filter((enemy) => !enemy.dead || enemy.fadeUntil > time);
+          this.enemies.length = write;
         }
 
         damageEnemy(enemy, amount) {
@@ -2147,7 +2389,7 @@
             return;
           }
 
-          if (this.hasSpringInvincibility()) {
+          if (this.hasPowerupInvincibility()) {
             return;
           }
 
@@ -2225,6 +2467,9 @@
         updateBlackHoles(dt) {
           let highestLevel = 0;
           for (const hole of this.blackHoles) {
+            if (!this.isInUpdateBand(hole.y, UPDATE_MARGIN_TOP + 80, UPDATE_MARGIN_BOTTOM + 80)) {
+              continue;
+            }
             hole.angle += dt * (Math.PI / 3);
             const dist = distance(this.player.x, this.player.y, hole.x, hole.y);
             if (dist < BLACK_HOLE_PULL_RADIUS) {
@@ -2239,7 +2484,7 @@
             }
 
             if (dist < BLACK_HOLE_KILL_RADIUS) {
-              if (this.hasSpringInvincibility()) {
+              if (this.hasPowerupInvincibility()) {
                 continue;
               }
               if (!this.consumeShield(hole.x, hole.y)) {
@@ -2254,7 +2499,11 @@
         // Shooting and pellets
         // ------------------------------------------------------------
         checkShotInput(time) {
-          if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE) && !this.gameOverShown) {
+          if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE) || Phaser.Input.Keyboard.JustDown(this.keys.ENTER)) {
+            if (this.gameOverShown) {
+              this.scene.restart();
+              return;
+            }
             this.tryShoot(this.player.x, this.player.y - 400);
           }
           if (time >= this.playerState.shootingUntil) {
@@ -2290,24 +2539,33 @@
         }
 
         updatePellets(dt) {
-          this.pellets = this.pellets.filter((pellet) => {
+          let write = 0;
+          for (let i = 0; i < this.pellets.length; i += 1) {
+            const pellet = this.pellets[i];
             pellet.trail.unshift({ x: pellet.x, y: pellet.y, life: 1 });
             pellet.trail = pellet.trail.slice(0, 3);
             pellet.x += pellet.vx * dt;
             pellet.y += pellet.vy * dt;
 
+            let keep = true;
             for (const enemy of this.enemies) {
               if (enemy.dead) {
                 continue;
               }
               if (rectsOverlap(pellet, enemy)) {
                 this.damageEnemy(enemy, 1);
-                return false;
+                keep = false;
+                break;
               }
             }
 
-            return pellet.y > this.cameras.main.scrollY - 80 && pellet.y < this.cameras.main.scrollY + GAME_H + 80 && pellet.x > -40 && pellet.x < GAME_W + 40;
-          });
+            keep = keep && pellet.y > this.cameras.main.scrollY - 80 && pellet.y < this.cameras.main.scrollY + GAME_H + 80 && pellet.x > -40 && pellet.x < GAME_W + 40;
+            if (keep) {
+              this.pellets[write] = pellet;
+              write += 1;
+            }
+          }
+          this.pellets.length = write;
         }
 
         // ------------------------------------------------------------
@@ -2317,19 +2575,65 @@
           const topCull = this.cameras.main.scrollY - CULL_ABOVE_MARGIN;
           const bottomCull = this.cameras.main.scrollY + GAME_H + CULL_BELOW_MARGIN;
 
-          this.platforms = this.platforms.filter((platform) => platform.y > topCull && platform.y < bottomCull && !platform.exploded);
-          this.pickups = this.pickups.filter((pickup) => pickup.y > topCull && pickup.y < bottomCull);
-          this.collectibles = this.collectibles.filter((item) => item.y > topCull && item.y < bottomCull);
-          this.enemies = this.enemies.filter((enemy) => enemy.y > topCull - 60 && enemy.y < bottomCull);
-          this.blackHoles = this.blackHoles.filter((hole) => hole.y > topCull - 80 && hole.y < bottomCull);
+          let platformWrite = 0;
+          let topPlatform = null;
+          for (let i = 0; i < this.platforms.length; i += 1) {
+            const platform = this.platforms[i];
+            const keep = platform.y > topCull && platform.y < bottomCull && !platform.exploded;
+            if (keep) {
+              this.platforms[platformWrite] = platform;
+              platformWrite += 1;
+              if (!topPlatform || platform.y < topPlatform.y) {
+                topPlatform = platform;
+              }
+            } else {
+              this.releaseEntitySprite(platform);
+            }
+          }
+          this.platforms.length = platformWrite;
+
+          let pickupWrite = 0;
+          for (let i = 0; i < this.pickups.length; i += 1) {
+            const pickup = this.pickups[i];
+            if (pickup.y > topCull && pickup.y < bottomCull) {
+              this.pickups[pickupWrite] = pickup;
+              pickupWrite += 1;
+            } else {
+              this.releaseEntitySprite(pickup);
+            }
+          }
+          this.pickups.length = pickupWrite;
+
+          let enemyWrite = 0;
+          for (let i = 0; i < this.enemies.length; i += 1) {
+            const enemy = this.enemies[i];
+            if (enemy.y > topCull - 60 && enemy.y < bottomCull) {
+              this.enemies[enemyWrite] = enemy;
+              enemyWrite += 1;
+            } else {
+              this.releaseEntitySprite(enemy);
+            }
+          }
+          this.enemies.length = enemyWrite;
+
+          let holeWrite = 0;
+          for (let i = 0; i < this.blackHoles.length; i += 1) {
+            const hole = this.blackHoles[i];
+            if (hole.y > topCull - 80 && hole.y < bottomCull) {
+              this.blackHoles[holeWrite] = hole;
+              holeWrite += 1;
+            }
+          }
+          this.blackHoles.length = holeWrite;
+
           if (this.effects.length > 120) {
             this.effects.splice(0, this.effects.length - 120);
           }
           if (this.pellets.length > MAX_PELLETS) {
             this.pellets.splice(0, this.pellets.length - MAX_PELLETS);
           }
-          if (this.platforms.length > 0) {
-            this.lastSpawnPlatform = this.platforms.reduce((best, platform) => (!best || platform.y < best.y ? platform : best), null);
+          if (topPlatform) {
+            this.lastSpawnPlatform = topPlatform;
             this.topSpawnY = this.lastSpawnPlatform.y;
             this.lastPlatformX = this.lastSpawnPlatform.x;
           } else {
@@ -2340,8 +2644,16 @@
         spawnAhead() {
           let guard = 0;
           while (guard < 24) {
-            const highestPlatformY = this.platforms.length > 0 ? Math.min(...this.platforms.map((platform) => platform.y)) : this.cameras.main.scrollY + GAME_H;
-            const visiblePlatforms = this.platforms.filter((platform) => platform.y > this.cameras.main.scrollY - 40 && platform.y < this.cameras.main.scrollY + GAME_H + 40 && platform.visible).length;
+            let highestPlatformY = this.cameras.main.scrollY + GAME_H;
+            let visiblePlatforms = 0;
+            for (const platform of this.platforms) {
+              if (platform.y < highestPlatformY) {
+                highestPlatformY = platform.y;
+              }
+              if (platform.y > this.cameras.main.scrollY - 40 && platform.y < this.cameras.main.scrollY + GAME_H + 40 && platform.visible) {
+                visiblePlatforms += 1;
+              }
+            }
             this.topSpawnY = highestPlatformY;
             if (highestPlatformY <= this.cameras.main.scrollY - PLATFORM_SPAWN_AHEAD && visiblePlatforms >= PLATFORM_VISIBLE_MIN) {
               break;
@@ -2420,10 +2732,12 @@
         }
 
         updateEffects(dt) {
-          this.effects = this.effects.filter((effect) => {
+          let write = 0;
+          for (let i = 0; i < this.effects.length; i += 1) {
+            const effect = this.effects[i];
             effect.life -= dt;
             if (effect.life <= 0) {
-              return false;
+              continue;
             }
             if (effect.type === "dust" || effect.type === "particle" || effect.type === "debris") {
               effect.x += effect.vx * dt;
@@ -2433,8 +2747,10 @@
             if (effect.type === "debris") {
               effect.angle += effect.spin * dt;
             }
-            return true;
-          });
+            this.effects[write] = effect;
+            write += 1;
+          }
+          this.effects.length = write;
         }
 
         // ------------------------------------------------------------
@@ -2447,6 +2763,7 @@
           this.gameOverShown = true;
           this.audio.stopAll();
           this.audio.gameOver();
+          this.gameOverLine.setText(this.getRandomGameOverLine());
           this.finalScore.setText(`${formatPoints(this.score)} PTS`);
           localStorage.setItem(BEST_SCORE_KEY, String(Math.max(this.bestScore, this.score)));
           this.overlay.setVisible(true);
@@ -2472,9 +2789,20 @@
           if (this.onOrientationChange) {
             window.removeEventListener("orientationchange", this.onOrientationChange);
           }
+          for (const platform of this.platforms) {
+            this.releaseEntitySprite(platform);
+          }
+          for (const pickup of this.pickups) {
+            this.releaseEntitySprite(pickup);
+          }
+          while (this.staticSpritePool && this.staticSpritePool.length > 0) {
+            const sprite = this.staticSpritePool.pop();
+            if (sprite && sprite.destroy) {
+              sprite.destroy();
+            }
+          }
           this.platforms.length = 0;
           this.pickups.length = 0;
-          this.collectibles.length = 0;
           this.enemies.length = 0;
           this.blackHoles.length = 0;
           this.pellets.length = 0;
@@ -2483,10 +2811,13 @@
             this.overlay,
             this.finalScore,
             this.scoreText,
+            this.bgBase,
+            this.bgBlend,
             this.bg,
             this.worldLayer,
             this.uiLayer,
-            this.player
+            this.player,
+            this.textureBuilder
           ].forEach((obj) => {
             if (obj && obj.destroy) {
               obj.destroy();
@@ -2495,60 +2826,70 @@
           this.overlay = null;
           this.finalScore = null;
           this.scoreText = null;
+          this.bgBase = null;
+          this.bgBlend = null;
           this.bg = null;
           this.worldLayer = null;
           this.uiLayer = null;
           this.player = null;
+          this.textureBuilder = null;
         }
 
         // ------------------------------------------------------------
         // Rendering
         // ------------------------------------------------------------
         renderAll(time, altitude) {
+          this.updateBackgroundBase(altitude);
           drawSketchbookBackground(this, this.bg, altitude, this.cameras.main.scrollY, time);
           this.worldLayer.clear();
 
           for (const platform of this.platforms) {
-            if (platform.visible && !platform.exploded) {
+            if (this.syncPlatformSprite(platform, time)) {
+              continue;
+            }
+            if (platform.visible && !platform.exploded && this.isInRenderBand(platform.y)) {
               drawPlatform(this.worldLayer, platform, time);
             }
           }
 
           for (const hole of this.blackHoles) {
-            drawBlackHole(this.worldLayer, hole);
+            if (this.isInRenderBand(hole.y, RENDER_MARGIN_TOP + 40, RENDER_MARGIN_BOTTOM + 60)) {
+              drawBlackHole(this.worldLayer, hole);
+            }
           }
 
           for (const pickup of this.pickups) {
-            drawPickup(this.worldLayer, pickup);
-          }
-
-          for (const item of this.collectibles) {
-            drawCollectible(this.worldLayer, item);
+            this.syncPickupSprite(pickup);
           }
 
           for (const enemy of this.enemies) {
-            if (!enemy.dead) {
+            if (!enemy.dead && this.isInRenderBand(enemy.y, RENDER_MARGIN_TOP + 40, RENDER_MARGIN_BOTTOM + 60)) {
               drawEnemy(this.worldLayer, enemy, time);
             }
           }
 
           for (const pellet of this.pellets) {
-            drawPellet(this.worldLayer, pellet);
+            if (this.isInRenderBand(pellet.y, RENDER_MARGIN_TOP + 40, RENDER_MARGIN_BOTTOM + 40)) {
+              drawPellet(this.worldLayer, pellet);
+            }
           }
 
           for (const effect of this.effects) {
-            drawEffect(this.worldLayer, effect);
+            if (this.isInRenderBand(effect.y, RENDER_MARGIN_TOP + 60, RENDER_MARGIN_BOTTOM + 60)) {
+              drawEffect(this.worldLayer, effect);
+            }
           }
 
           drawBandit(this.worldLayer, {
             x: this.player.x,
             y: this.player.y,
+            vx: this.player.body.velocity.x,
             vy: this.player.body.velocity.y,
             dir: this.playerState.dir,
             scaleX: this.playerState.scaleX,
             scaleY: this.playerState.scaleY,
             shooting: this.playerState.shootingUntil > this.time.now,
-            flash: this.playerState.flashUntil > this.time.now || (this.hasSpringInvincibility(time) && Math.floor(time / 90) % 2 === 0),
+            flash: this.playerState.flashUntil > this.time.now,
             propeller: this.time.now < this.playerState.propellerUntil,
             shield: this.playerState.shield,
             jetpack: this.time.now < this.playerState.jetpackUntil,
@@ -2560,30 +2901,6 @@
 
         drawHUDDecor(time) {
           this.uiLayer.clear();
-
-          if (this.playerState.shield) {
-            for (let r = 34; r >= 18; r -= 8) {
-              this.uiLayer.lineStyle(2, COLORS.white, 0.06 * r / 18);
-              this.uiLayer.strokeCircle(GAME_W - 96, 58, r);
-            }
-          }
-
-          if (time < this.playerState.jetpackUntil) {
-            const pct = clamp((this.playerState.jetpackUntil - time) / JETPACK_MS, 0, 1);
-            this.uiLayer.fillStyle(COLORS.ink, 0.25);
-            this.uiLayer.fillRect(GAME_W - 170, 96, 140, 10);
-            this.uiLayer.fillStyle(COLORS.gold, 1);
-            this.uiLayer.fillRect(GAME_W - 170, 96, 140 * pct, 10);
-            this.uiLayer.lineStyle(2, COLORS.ink, 1);
-            this.uiLayer.strokeRect(GAME_W - 170, 96, 140, 10);
-          }
-
-          if (this.playerState.springBoots > 0) {
-            this.uiLayer.fillStyle(COLORS.gold, 1);
-            for (let i = 0; i < this.playerState.springBoots; i += 1) {
-              this.uiLayer.fillCircle(GAME_W - 40 - i * 14, 118, 4);
-            }
-          }
         }
       }
 
@@ -2690,14 +3007,26 @@
         const rising = state.vy < -50;
         const falling = state.vy > 120;
         const hatOffsetY = rising ? -2 : falling ? 2 : 0;
-        const ponchoExtra = rising ? 4 : falling ? -2 : 0;
+        const coatFlare = rising ? 6 : falling ? -1 : 2;
         const eyeRadius = rising ? 6 : 5;
         const pupilRadius = rising ? 3 : 2.5;
+        const moveIntent = clamp((state.vx || 0) / PLAYER_SPEED, -1, 1);
+        const facing = moveIntent === 0 ? state.dir : moveIntent < 0 ? -1 : 1;
+        const moveLean = moveIntent * 6;
+        const headTilt = state.shooting ? -2 : facing * 0.5;
+        const bodyLean = moveLean;
+        const shoulderShift = moveLean * 0.55;
+        const hipShift = moveLean * 0.25;
+        const hatShift = moveLean * 0.7;
+        const legSwing = moveLean * 0.35;
         const x = state.x;
         const y = state.y;
         const avgScale = (state.scaleX + state.scaleY) * 0.5;
         const sx = (value) => x + value * state.scaleX;
         const sy = (value) => y + value * state.scaleY;
+        const strokePoly = (points, fillColor, alpha = 1, width = OUTLINE_W - 1) => {
+          fillStrokePolygon(g, points, fillColor, alpha, COLORS.ink, width);
+        };
 
         if (state.shield) {
           for (let r = 34; r >= 18; r -= 8) {
@@ -2709,102 +3038,262 @@
         if (state.jetpack) {
           for (let i = 0; i < 4; i += 1) {
             g.fillStyle(COLORS.poncho, 0.2 + i * 0.08);
-            g.fillCircle(sx(-6 + i * 4), sy(34 + i * 7), (8 + i * 2) * avgScale);
+            g.fillCircle(sx(-6 + i * 4 - moveLean * 0.3), sy(34 + i * 7), (8 + i * 2) * avgScale);
           }
         }
 
         if (state.rocket) {
           g.fillStyle(COLORS.rust, 1);
-          g.fillTriangle(sx(-10), sy(16), sx(-2), sy(2), sx(6), sy(16));
+          g.fillTriangle(sx(-10 - hipShift), sy(16), sx(-2 - hipShift), sy(2), sx(6 - hipShift), sy(16));
           g.lineStyle(2, COLORS.ink, 1);
-          g.strokeTriangle(sx(-10), sy(16), sx(-2), sy(2), sx(6), sy(16));
+          g.strokeTriangle(sx(-10 - hipShift), sy(16), sx(-2 - hipShift), sy(2), sx(6 - hipShift), sy(16));
           g.fillStyle(COLORS.gold, 0.7);
-          g.fillCircle(sx(-2), sy(22), 6 * avgScale);
+          g.fillCircle(sx(-2 - hipShift), sy(22), 6 * avgScale);
         }
+
+        const coatTailLeft = [
+          { x: sx(-16 + shoulderShift), y: sy(4) },
+          { x: sx(-22 - coatFlare + hipShift * 0.25), y: sy(14) },
+          { x: sx(-18 - coatFlare * 0.7 + legSwing * 0.4), y: sy(30) },
+          { x: sx(-8 + hipShift), y: sy(26) },
+          { x: sx(-6 + shoulderShift * 0.6), y: sy(8) }
+        ];
+        const coatTailRight = [
+          { x: sx(14 + shoulderShift), y: sy(4) },
+          { x: sx(22 + coatFlare + hipShift * 0.25), y: sy(15) },
+          { x: sx(18 + coatFlare * 0.7 + legSwing * 0.4), y: sy(31) },
+          { x: sx(7 + hipShift), y: sy(27) },
+          { x: sx(6 + shoulderShift * 0.6), y: sy(7) }
+        ];
+        strokePoly(coatTailLeft, COLORS.charcoal, 1, OUTLINE_W - 2);
+        strokePoly(coatTailRight, COLORS.charcoal, 1, OUTLINE_W - 2);
+
+        const armLeft = [
+          { x: sx(-17 + shoulderShift), y: sy(-2) },
+          { x: sx(-24 + shoulderShift * 0.6), y: sy(7) },
+          { x: sx(-20 + shoulderShift * 0.5), y: sy(16) },
+          { x: sx(-11 + shoulderShift * 0.7), y: sy(12) },
+          { x: sx(-10 + shoulderShift), y: sy(1) }
+        ];
+        const armRight = [
+          { x: sx(16 + shoulderShift), y: sy(-2) },
+          { x: sx(24 + shoulderShift * 0.6), y: sy(7) },
+          { x: sx(20 + shoulderShift * 0.5), y: sy(16) },
+          { x: sx(11 + shoulderShift * 0.7), y: sy(12) },
+          { x: sx(10 + shoulderShift), y: sy(1) }
+        ];
+        strokePoly(armLeft, COLORS.charcoal, 1, OUTLINE_W - 2);
+        strokePoly(armRight, COLORS.charcoal, 1, OUTLINE_W - 2);
+        g.fillStyle(COLORS.tan, 1);
+        g.fillCircle(sx(-22 + shoulderShift * 0.55), sy(15), 5 * avgScale);
+        g.fillCircle(sx(22 + shoulderShift * 0.55), sy(15), 5 * avgScale);
+        g.lineStyle(OUTLINE_W - 2, COLORS.ink, 1);
+        g.strokeCircle(sx(-22 + shoulderShift * 0.55), sy(15), 5 * avgScale);
+        g.strokeCircle(sx(22 + shoulderShift * 0.55), sy(15), 5 * avgScale);
+
+        const bodyPoints = [
+          { x: sx(-12 - coatFlare * 0.3 + shoulderShift), y: sy(-1) },
+          { x: sx(-17 - coatFlare * 0.4 + shoulderShift * 0.55), y: sy(10) },
+          { x: sx(-12 + hipShift), y: sy(24) },
+          { x: sx(0 + hipShift), y: sy(30) },
+          { x: sx(12 + hipShift), y: sy(24) },
+          { x: sx(17 + coatFlare * 0.4 + shoulderShift * 0.55), y: sy(10) },
+          { x: sx(12 + coatFlare * 0.3 + shoulderShift), y: sy(-1) },
+          { x: sx(0 + shoulderShift * 0.3), y: sy(-13) }
+        ];
+        strokePoly(bodyPoints, COLORS.charcoal, 1, OUTLINE_W - 1);
 
         const ponchoPoints = [
-          { x: sx(-16 - ponchoExtra), y: sy(4) },
-          { x: sx(-11), y: sy(22) },
-          { x: sx(-5), y: sy(28) },
-          { x: sx(7), y: sy(28) },
-          { x: sx(14), y: sy(22) },
-          { x: sx(18 + ponchoExtra), y: sy(4) },
-          { x: sx(0), y: sy(-12) }
+          { x: sx(-9 + shoulderShift * 0.8), y: sy(2) },
+          { x: sx(-13 + shoulderShift * 0.45), y: sy(12) },
+          { x: sx(-8 + hipShift), y: sy(20) },
+          { x: sx(0 + hipShift), y: sy(24) },
+          { x: sx(8 + hipShift), y: sy(20) },
+          { x: sx(13 + shoulderShift * 0.45), y: sy(12) },
+          { x: sx(9 + shoulderShift * 0.8), y: sy(2) },
+          { x: sx(0 + shoulderShift * 0.35), y: sy(-8) }
         ];
-        fillStrokePolygon(g, ponchoPoints, COLORS.poncho, 1, COLORS.ink, OUTLINE_W);
+        strokePoly(ponchoPoints, COLORS.poncho);
 
-        g.fillStyle(COLORS.bandana, 1);
-        g.fillRect(sx(-11), sy(-2), 22 * state.scaleX, 12 * state.scaleY);
-        g.lineStyle(OUTLINE_W, COLORS.ink, 1);
-        g.strokeRect(sx(-11), sy(-2), 22 * state.scaleX, 12 * state.scaleY);
+        g.fillStyle(COLORS.tan, 1);
+        g.fillEllipse(sx(0 + shoulderShift * 0.55), sy(-13 + headTilt), 25 * state.scaleX, 24 * state.scaleY);
+        g.lineStyle(OUTLINE_W - 1, COLORS.ink, 1);
+        g.strokeEllipse(sx(0 + shoulderShift * 0.55), sy(-13 + headTilt), 25 * state.scaleX, 24 * state.scaleY);
+
+        const bandanaPoints = [
+          { x: sx(-12 + shoulderShift * 0.55), y: sy(-8 + headTilt) },
+          { x: sx(12 + shoulderShift * 0.55), y: sy(-8 + headTilt) },
+          { x: sx(0 + shoulderShift * 0.8), y: sy(10) }
+        ];
+        strokePoly(bandanaPoints, COLORS.bandana, 1, OUTLINE_W - 1);
+        g.lineStyle(2, COLORS.ink, 0.35);
+        g.beginPath();
+        g.moveTo(sx(-7 + shoulderShift * 0.7), sy(-1 + headTilt));
+        g.lineTo(sx(0 + shoulderShift * 0.8), sy(4));
+        g.lineTo(sx(7 + shoulderShift * 0.7), sy(-1 + headTilt));
+        g.strokePath();
+        g.beginPath();
+        g.moveTo(sx(-3 + shoulderShift * 0.75), sy(3));
+        g.lineTo(sx(3 + shoulderShift * 0.75), sy(0));
+        g.strokePath();
+        g.beginPath();
+        g.moveTo(sx(-11 + shoulderShift * 0.65), sy(4));
+        g.lineTo(sx(-16 + shoulderShift * 0.35), sy(8));
+        g.strokePath();
+        g.beginPath();
+        g.moveTo(sx(11 + shoulderShift * 0.65), sy(4));
+        g.lineTo(sx(16 + shoulderShift * 0.35), sy(8));
+        g.strokePath();
 
         g.fillStyle(COLORS.white, 1);
-        g.fillEllipse(sx(-6), sy(-11), 9 * state.scaleX, eyeRadius * 2 * state.scaleY);
-        g.fillEllipse(sx(8), sy(-11), 9 * state.scaleX, eyeRadius * 2 * state.scaleY);
+        g.fillEllipse(sx(-5 + shoulderShift * 0.55), sy(-14 + headTilt), 8 * state.scaleX, eyeRadius * 2 * state.scaleY);
+        g.fillEllipse(sx(7 + shoulderShift * 0.55), sy(-14 + headTilt), 8 * state.scaleX, eyeRadius * 2 * state.scaleY);
         g.fillStyle(COLORS.ink, 1);
-        const pupilShift = state.dir * 3;
-        g.fillCircle(sx(-6 + pupilShift * 0.55), sy(-11), pupilRadius * avgScale);
-        g.fillCircle(sx(8 + pupilShift * 0.55), sy(-11), pupilRadius * avgScale);
+        const pupilShift = facing * 3;
+        g.fillCircle(sx(-5 + shoulderShift * 0.55 + pupilShift * 0.55), sy(-14 + headTilt), pupilRadius * avgScale);
+        g.fillCircle(sx(7 + shoulderShift * 0.55 + pupilShift * 0.55), sy(-14 + headTilt), pupilRadius * avgScale);
 
+        g.lineStyle(3, COLORS.ink, 1);
         if (falling) {
-          g.lineStyle(3, COLORS.ink, 1);
           g.beginPath();
-          g.moveTo(sx(-11), sy(-18));
-          g.lineTo(sx(-1), sy(-20));
+          g.moveTo(sx(-10 + shoulderShift * 0.55), sy(-20 + headTilt));
+          g.lineTo(sx(-1 + shoulderShift * 0.55), sy(-22 + headTilt));
           g.strokePath();
           g.beginPath();
-          g.moveTo(sx(13), sy(-20));
-          g.lineTo(sx(3), sy(-18));
+          g.moveTo(sx(12 + shoulderShift * 0.55), sy(-22 + headTilt));
+          g.lineTo(sx(3 + shoulderShift * 0.55), sy(-20 + headTilt));
+          g.strokePath();
+        } else {
+          g.beginPath();
+          g.moveTo(sx(-10 + shoulderShift * 0.55), sy(-21 + headTilt));
+          g.lineTo(sx(-1 + shoulderShift * 0.55), sy(-19 + headTilt));
+          g.strokePath();
+          g.beginPath();
+          g.moveTo(sx(12 + shoulderShift * 0.55), sy(-19 + headTilt));
+          g.lineTo(sx(3 + shoulderShift * 0.55), sy(-21 + headTilt));
           g.strokePath();
         }
+
+        g.lineStyle(2, COLORS.ink, 0.35);
+        g.beginPath();
+        g.moveTo(sx(-10 + shoulderShift * 0.55), sy(-9 + headTilt));
+        g.lineTo(sx(10 + shoulderShift * 0.55), sy(-9 + headTilt));
+        g.strokePath();
 
         if (state.propeller) {
           const rotorAngle = time * 0.04;
           const rotorDx = Math.cos(rotorAngle) * 14;
           const rotorDy = Math.sin(rotorAngle) * 3;
           g.fillStyle(COLORS.teal, 1);
-          g.fillEllipse(sx(0), sy(-28 + hatOffsetY), 28 * state.scaleX, 10 * state.scaleY);
+          g.fillEllipse(sx(0 + hatShift), sy(-28 + hatOffsetY), 28 * state.scaleX, 10 * state.scaleY);
           g.lineStyle(OUTLINE_W, COLORS.ink, 1);
-          g.strokeEllipse(sx(0), sy(-28 + hatOffsetY), 28 * state.scaleX, 10 * state.scaleY);
+          g.strokeEllipse(sx(0 + hatShift), sy(-28 + hatOffsetY), 28 * state.scaleX, 10 * state.scaleY);
           g.beginPath();
-          g.moveTo(sx(0), sy(-38 + hatOffsetY));
-          g.lineTo(sx(0), sy(-26 + hatOffsetY));
+          g.moveTo(sx(0 + hatShift), sy(-38 + hatOffsetY));
+          g.lineTo(sx(0 + hatShift), sy(-26 + hatOffsetY));
           g.strokePath();
           g.beginPath();
-          g.moveTo(sx(-rotorDx), sy(-38 + hatOffsetY - rotorDy));
-          g.lineTo(sx(rotorDx), sy(-38 + hatOffsetY + rotorDy));
+          g.moveTo(sx(-rotorDx + hatShift), sy(-38 + hatOffsetY - rotorDy));
+          g.lineTo(sx(rotorDx + hatShift), sy(-38 + hatOffsetY + rotorDy));
           g.strokePath();
           g.lineStyle(2, COLORS.ink, 0.35);
           g.beginPath();
-          g.moveTo(sx(-10), sy(-38 + hatOffsetY));
-          g.lineTo(sx(10), sy(-38 + hatOffsetY));
+          g.moveTo(sx(-10 + hatShift), sy(-38 + hatOffsetY));
+          g.lineTo(sx(10 + hatShift), sy(-38 + hatOffsetY));
           g.strokePath();
         } else {
-          g.fillStyle(COLORS.hat, 1);
-          g.fillEllipse(sx(0), sy(-28 + hatOffsetY), 42 * state.scaleX, 10 * state.scaleY);
-          g.fillRect(sx(-16), sy(-42 + hatOffsetY), 28 * state.scaleX, 14 * state.scaleY);
-          g.lineStyle(OUTLINE_W, COLORS.ink, 1);
-          g.strokeEllipse(sx(0), sy(-28 + hatOffsetY), 42 * state.scaleX, 10 * state.scaleY);
-          g.strokeRect(sx(-16), sy(-42 + hatOffsetY), 28 * state.scaleX, 14 * state.scaleY);
-          drawStar(g, sx(4), sy(-34 + hatOffsetY), 2 * avgScale, 5 * avgScale, 5, Math.PI / 2, COLORS.gold, COLORS.ink, 1);
+          const brim = [
+            { x: sx(-23 + hatShift), y: sy(-30 + hatOffsetY) },
+            { x: sx(-15 + hatShift), y: sy(-36 + hatOffsetY) },
+            { x: sx(-2 + hatShift), y: sy(-38 + hatOffsetY) },
+            { x: sx(11 + hatShift), y: sy(-36 + hatOffsetY) },
+            { x: sx(24 + hatShift), y: sy(-29 + hatOffsetY) },
+            { x: sx(18 + hatShift), y: sy(-24 + hatOffsetY) },
+            { x: sx(1 + hatShift), y: sy(-22 + hatOffsetY) },
+            { x: sx(-16 + hatShift), y: sy(-24 + hatOffsetY) }
+          ];
+          const crown = [
+            { x: sx(-13 + hatShift), y: sy(-41 + hatOffsetY) },
+            { x: sx(-10 + hatShift), y: sy(-48 + hatOffsetY) },
+            { x: sx(-2 + hatShift), y: sy(-51 + hatOffsetY) },
+            { x: sx(8 + hatShift), y: sy(-49 + hatOffsetY) },
+            { x: sx(12 + hatShift), y: sy(-43 + hatOffsetY) },
+            { x: sx(10 + hatShift), y: sy(-32 + hatOffsetY) },
+            { x: sx(-10 + hatShift), y: sy(-32 + hatOffsetY) }
+          ];
+          strokePoly(brim, COLORS.hat);
+          strokePoly(crown, COLORS.hat);
+          g.lineStyle(3, COLORS.oldBrass, 1);
+          g.beginPath();
+          g.moveTo(sx(-11 + hatShift), sy(-33 + hatOffsetY));
+          g.lineTo(sx(10 + hatShift), sy(-33 + hatOffsetY));
+          g.strokePath();
+          drawStar(g, sx(4 + hatShift), sy(-36 + hatOffsetY), 2 * avgScale, 5 * avgScale, 5, Math.PI / 2, COLORS.gold, COLORS.ink, 1);
+          const feather = [
+            { x: sx(-11 + hatShift), y: sy(-45 + hatOffsetY) },
+            { x: sx(-18 + hatShift), y: sy(-54 + hatOffsetY) },
+            { x: sx(-12 + hatShift), y: sy(-53 + hatOffsetY) },
+            { x: sx(-7 + hatShift), y: sy(-43 + hatOffsetY) }
+          ];
+          strokePoly(feather, COLORS.tan, 1, 2);
         }
 
         g.fillStyle(COLORS.boots, 1);
-        g.fillRect(sx(-11), sy(26), 9 * state.scaleX, 11 * state.scaleY);
-        g.fillRect(sx(3), sy(26), 9 * state.scaleX, 11 * state.scaleY);
-        g.lineStyle(OUTLINE_W - 1, COLORS.ink, 1);
-        g.strokeRect(sx(-11), sy(26), 9 * state.scaleX, 11 * state.scaleY);
-        g.strokeRect(sx(3), sy(26), 9 * state.scaleX, 11 * state.scaleY);
+        const legLeft = [
+          { x: sx(-8 + hipShift), y: sy(20) },
+          { x: sx(-13 + hipShift - legSwing * 0.35), y: sy(30) },
+          { x: sx(-10 + hipShift - legSwing * 0.55), y: sy(36) },
+          { x: sx(-1 + hipShift - legSwing * 0.2), y: sy(35) },
+          { x: sx(1 + hipShift), y: sy(24) }
+        ];
+        const legRight = [
+          { x: sx(8 + hipShift), y: sy(20) },
+          { x: sx(13 + hipShift + legSwing * 0.35), y: sy(30) },
+          { x: sx(10 + hipShift + legSwing * 0.55), y: sy(36) },
+          { x: sx(1 + hipShift + legSwing * 0.2), y: sy(35) },
+          { x: sx(-1 + hipShift), y: sy(24) }
+        ];
+        strokePoly(legLeft, COLORS.boots, 1, OUTLINE_W - 2);
+        strokePoly(legRight, COLORS.boots, 1, OUTLINE_W - 2);
+        const bootLeft = [
+          { x: sx(-14 + hipShift - legSwing * 0.55), y: sy(34) },
+          { x: sx(-17 + hipShift - legSwing * 0.7), y: sy(39) },
+          { x: sx(-7 + hipShift - legSwing * 0.2), y: sy(39) },
+          { x: sx(-4 + hipShift), y: sy(35) }
+        ];
+        const bootRight = [
+          { x: sx(14 + hipShift + legSwing * 0.55), y: sy(34) },
+          { x: sx(17 + hipShift + legSwing * 0.7), y: sy(39) },
+          { x: sx(7 + hipShift + legSwing * 0.2), y: sy(39) },
+          { x: sx(4 + hipShift), y: sy(35) }
+        ];
+        strokePoly(bootLeft, COLORS.boots, 1, OUTLINE_W - 2);
+        strokePoly(bootRight, COLORS.boots, 1, OUTLINE_W - 2);
+
+        g.lineStyle(3, COLORS.oldBrass, 1);
+        g.beginPath();
+        g.moveTo(sx(-12 + hipShift), sy(13));
+        g.lineTo(sx(13 + hipShift), sy(13));
+        g.strokePath();
+        g.lineStyle(2, COLORS.gold, 0.8);
+        g.beginPath();
+        g.moveTo(sx(-8 + shoulderShift * 0.65), sy(8));
+        g.lineTo(sx(7 + hipShift), sy(18));
+        g.strokePath();
+        for (let i = 0; i < 4; i += 1) {
+          g.fillStyle(COLORS.gold, 1);
+          g.fillCircle(sx(-5 + i * 4 + shoulderShift * 0.5), sy(10 + i * 2), 2.2 * avgScale);
+        }
 
         g.fillStyle(COLORS.charcoal, 1);
-        g.fillRect(sx(12), sy(5), 9 * state.scaleX, 4 * state.scaleY);
-        g.fillRect(sx(18), sy(2), 7 * state.scaleX, 3 * state.scaleY);
+        g.fillRect(sx(13 + shoulderShift * 0.6), sy(8), 8 * state.scaleX, 4 * state.scaleY);
+        g.fillRect(sx(19 + shoulderShift * 0.7), sy(5), 7 * state.scaleX, 3 * state.scaleY);
         g.lineStyle(3, COLORS.ink, 1);
-        g.strokeRect(sx(12), sy(5), 9 * state.scaleX, 4 * state.scaleY);
-        g.strokeRect(sx(18), sy(2), 7 * state.scaleX, 3 * state.scaleY);
+        g.strokeRect(sx(13 + shoulderShift * 0.6), sy(8), 8 * state.scaleX, 4 * state.scaleY);
+        g.strokeRect(sx(19 + shoulderShift * 0.7), sy(5), 7 * state.scaleX, 3 * state.scaleY);
 
         if (state.shooting) {
-          drawStar(g, sx(27), sy(3), 2 * avgScale, 7 * avgScale, 4, Math.PI / 4, COLORS.gold, COLORS.gold, 1);
+          drawStar(g, sx(27 + shoulderShift * 0.7), sy(9), 2 * avgScale, 7 * avgScale, 4, Math.PI / 4, COLORS.gold, COLORS.gold, 1);
         }
 
         if (state.flash) {
