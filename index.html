@@ -120,10 +120,13 @@
       const OPENING_GAP_MIN = 92;
       const OPENING_GAP_MAX = 120;
       const OPENING_CHALLENGE_ALTITUDE = 1350;
-      const GAME_OVER_BUTTON_W = 220;
-      const GAME_OVER_BUTTON_H = 58;
-      const RIDE_AGAIN_Y = 492;
-      const SALOON_Y = 574;
+      const GAME_OVER_TITLE_Y = 248;
+      const GAME_OVER_LINE_Y = 332;
+      const GAME_OVER_SCORE_Y = 418;
+      const GAME_OVER_BUTTON_W = 236;
+      const GAME_OVER_BUTTON_H = 64;
+      const RIDE_AGAIN_Y = 500;
+      const SALOON_Y = 582;
       const CULL_ABOVE_MARGIN = 420;
       const CULL_BELOW_MARGIN = 180;
       const SAFE_JUMP_VERTICAL_MARGIN = 20;
@@ -1449,25 +1452,25 @@
           this.overlay.setVisible(false);
 
           const dim = this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, 0xF4E4BC, 0.88);
-          const gonerShadow = this.add.text(cx + 3, 250 + 3, "GOONER!", {
+          const gonerShadow = this.add.text(cx + 3, GAME_OVER_TITLE_Y + 3, "GOONER!", {
             fontFamily: "Georgia, serif",
             fontSize: "64px",
             fontStyle: "bold",
             color: CSS.bandana
           }).setOrigin(0.5);
-          const goner = this.add.text(cx, 250, "GOONER!", {
+          const goner = this.add.text(cx, GAME_OVER_TITLE_Y, "GOONER!", {
             fontFamily: "Georgia, serif",
             fontSize: "64px",
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5);
-          this.gameOverLine = this.add.text(cx, 322, GOONER_LINES[0], {
+          this.gameOverLine = this.add.text(cx, GAME_OVER_LINE_Y, GOONER_LINES[0], {
             fontFamily: "Georgia, serif",
             fontSize: "24px",
             fontStyle: "italic",
             color: "#5E442C"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2);
-          this.finalScore = this.add.text(cx, 390, "0 PTS", {
+          this.finalScore = this.add.text(cx, GAME_OVER_SCORE_Y, "0 PTS", {
             fontFamily: "Georgia, serif",
             fontSize: "34px",
             fontStyle: "bold",
