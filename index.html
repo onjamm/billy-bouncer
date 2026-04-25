@@ -117,6 +117,11 @@
       const ENEMY_BAND_SPACING = 138;
       const ENEMY_SAME_BAND_X_SPACING = 144;
       const PLATFORM_LANDING_STRIP = 42;
+      const TILT_DEAD_ZONE = 2.5;
+      const TILT_FULL_STEER = 28;
+      const TILT_SMOOTHING = 0.18;
+      const TILT_BASELINE_LERP = 0.04;
+      const TILT_MIN_INTENT = 0.08;
 
       const COLORS = {
         ink: 0x1C1208,
@@ -368,6 +373,30 @@
 
       function bootDotsText(count) {
         return "● ".repeat(count).trim();
+      }
+
+      function isTouchDevice() {
+        return typeof navigator !== "undefined" && (navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ""));
+      }
+
+      function supportsTiltControls() {
+        return typeof window !== "undefined" && typeof window.DeviceOrientationEvent !== "undefined";
+      }
+
+      async function requestTiltPermission() {
+        if (!supportsTiltControls()) {
+          return false;
+        }
+        const request = window.DeviceOrientationEvent.requestPermission;
+        if (typeof request === "function") {
+          try {
+            const result = await request.call(window.DeviceOrientationEvent);
+            return result === "granted";
+          } catch (error) {
+            return false;
+          }
+        }
+        return true;
       }
 
       // ============================================================
@@ -733,6 +762,7 @@
 
           const bestScore = Number(localStorage.getItem(BEST_SCORE_KEY) || 0);
           const centerX = GAME_W / 2;
+          const touchTilt = isTouchDevice() && supportsTiltControls();
 
           this.titleShadow = this.add.text(centerX + 4, 132 + 4, "BILLY BOUNCER", {
             fontFamily: "Georgia, serif",
@@ -757,14 +787,21 @@
             color: "#4A3423"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setShadow(0, 1, "rgba(28,18,8,0.14)", 0);
 
-          this.prompt = this.add.text(centerX, 620, "TAP TO PLAY OR PRESS SPACE", {
+          this.prompt = this.add.text(centerX, 620, touchTilt ? "TAP TO PLAY" : "TAP TO PLAY OR PRESS SPACE", {
             fontFamily: "Georgia, serif",
             fontSize: "22px",
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#EEDAA8", 2).setShadow(0, 2, "rgba(28,18,8,0.16)", 0);
 
-          this.best = this.add.text(centerX, 668, bestScore > 0 ? `BEST: ${formatPoints(bestScore)} PTS` : "NO POSTERS YET", {
+          this.controlsHint = this.add.text(centerX, 660, touchTilt ? "Phone: tilt to steer Billy left and right" : "Desktop: arrows or A / D to steer", {
+            fontFamily: "Georgia, serif",
+            fontSize: "15px",
+            fontStyle: "italic",
+            color: "#6A513A"
+          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setShadow(0, 1, "rgba(28,18,8,0.10)", 0);
+
+          this.best = this.add.text(centerX, 698, bestScore > 0 ? `BEST: ${formatPoints(bestScore)} PTS` : "NO POSTERS YET", {
             fontFamily: "Georgia, serif",
             fontSize: "20px",
             fontStyle: "bold",
@@ -784,6 +821,7 @@
             this.title,
             this.subtitle,
             this.prompt,
+            this.controlsHint,
             this.best
           ].forEach((obj) => {
             if (obj && obj.destroy) {
@@ -794,9 +832,12 @@
           this.preview = null;
         }
 
-        startGame() {
+        async startGame() {
           this.audio.unlock();
-          this.scene.start("game");
+          const motionGranted = await requestTiltPermission();
+          this.scene.start("game", {
+            motionGranted
+          });
         }
 
         update(time) {
@@ -845,6 +886,10 @@
           super("game");
         }
 
+        init(data) {
+          this.motionGranted = !!(data && data.motionGranted);
+        }
+
         create() {
           this.audio = this.game.audioEngine || new AudioEngine();
           this.game.audioEngine = this.audio;
@@ -867,6 +912,7 @@
           this.cursors = this.input.keyboard.createCursorKeys();
           this.keys = this.input.keyboard.addKeys("A,D,SPACE");
           this.onPointerDown = (pointer) => {
+            void this.ensureMotionPermission();
             if (this.gameOverShown) {
               this.handleOverlayPointer(pointer);
               return;
@@ -875,6 +921,7 @@
           };
           this.input.on("pointerdown", this.onPointerDown);
           this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
+          this.setupMotionControls();
 
           // Core state
           this.playerState = {
@@ -1372,6 +1419,87 @@
         // ------------------------------------------------------------
         // Player movement and power-up logic
         // ------------------------------------------------------------
+        setupMotionControls() {
+          this.motion = {
+            supported: supportsTiltControls(),
+            active: this.motionGranted || (supportsTiltControls() && typeof window.DeviceOrientationEvent.requestPermission !== "function"),
+            calibrated: false,
+            baseline: 0,
+            rawGamma: 0,
+            intent: 0,
+            permissionDenied: false
+          };
+
+          if (!this.motion.supported) {
+            return;
+          }
+
+          this.onDeviceOrientation = (event) => {
+            if (!this.motion.active) {
+              return;
+            }
+
+            let gamma = typeof event.gamma === "number" ? event.gamma : null;
+            if (gamma === null && typeof event.beta === "number") {
+              gamma = event.beta;
+            }
+            if (gamma === null) {
+              return;
+            }
+
+            gamma = clamp(gamma, -45, 45);
+            this.motion.rawGamma = gamma;
+
+            if (!this.motion.calibrated) {
+              this.motion.baseline = gamma;
+              this.motion.intent = 0;
+              this.motion.calibrated = true;
+            } else if (Math.abs(this.motion.intent) < TILT_MIN_INTENT) {
+              this.motion.baseline = lerp(this.motion.baseline, gamma, TILT_BASELINE_LERP);
+            }
+
+            const relativeGamma = gamma - this.motion.baseline;
+            const absGamma = Math.abs(relativeGamma);
+            const normalized = absGamma <= TILT_DEAD_ZONE ? 0 : clamp(relativeGamma / TILT_FULL_STEER, -1, 1);
+            this.motion.intent = lerp(this.motion.intent, normalized, TILT_SMOOTHING);
+          };
+
+          this.onOrientationChange = () => {
+            if (!this.motion) {
+              return;
+            }
+            this.motion.calibrated = false;
+            this.motion.intent = 0;
+          };
+
+          window.addEventListener("deviceorientation", this.onDeviceOrientation);
+          window.addEventListener("orientationchange", this.onOrientationChange);
+        }
+
+        async ensureMotionPermission() {
+          if (!this.motion || !this.motion.supported || this.motion.active) {
+            return this.motion ? this.motion.active : false;
+          }
+
+          const granted = await requestTiltPermission();
+          this.motion.active = granted;
+          this.motion.permissionDenied = !granted;
+
+          if (granted) {
+            this.motion.calibrated = false;
+            this.motion.intent = 0;
+          }
+
+          return granted;
+        }
+
+        getTiltAxis() {
+          if (!this.motion || !this.motion.active) {
+            return 0;
+          }
+          return Math.abs(this.motion.intent) < TILT_MIN_INTENT ? 0 : clamp(this.motion.intent, -1, 1);
+        }
+
         updatePlayerControl(time) {
           const body = this.player.body;
           const left = this.cursors.left.isDown || this.keys.A.isDown;
@@ -1382,6 +1510,9 @@
           }
           if (right) {
             move = 1;
+          }
+          if (move === 0) {
+            move = this.getTiltAxis();
           }
 
           if (!this.playerState.abducting && time < this.playerState.rocketUntil) {
@@ -1394,7 +1525,7 @@
           }
 
           if (move !== 0) {
-            this.playerState.dir = move;
+            this.playerState.dir = move < 0 ? -1 : 1;
           }
 
           if (time < this.playerState.jetpackUntil) {
@@ -2081,6 +2212,12 @@
           this.audio.stopAll();
           if (this.onPointerDown) {
             this.input.off("pointerdown", this.onPointerDown);
+          }
+          if (this.onDeviceOrientation) {
+            window.removeEventListener("deviceorientation", this.onDeviceOrientation);
+          }
+          if (this.onOrientationChange) {
+            window.removeEventListener("orientationchange", this.onOrientationChange);
           }
           this.platforms.length = 0;
           this.pickups.length = 0;

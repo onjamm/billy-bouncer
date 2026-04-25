@@ -109,6 +109,12 @@ The goal was not just "western colors," but a game that feels like somebody's ou
 - `Mouse Click` - shoot toward cursor
 - `Space` - start from menu / shoot upward in-game
 
+### Phone
+
+- Tilt the phone left or right to steer Billy, in the same spirit as classic Doodle Jump motion controls
+- Tap to start
+- Tap the screen to shoot
+
 Billy handles jumping on his own. Your whole job is route choice, horizontal control, timing, and survival.
 
 ## Tech Notes
