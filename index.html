@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Billy Bouncer is a frontier jumper where one bad landing turns a hot streak into a wanted poster." />
   <title>Billy Bouncer</title>
   <link
     rel="icon"
@@ -928,9 +929,12 @@
           const touchTilt = isTouchDevice() && supportsTiltControls();
           const secureTilt = touchTilt && isMotionSecureContext();
           const explicitTiltPermission = touchTilt && needsExplicitTiltPermission();
+          const showTiltButton = explicitTiltPermission && secureTilt;
           const controlsHintText = touchTilt
             ? (secureTilt ? (explicitTiltPermission ? "Phone: tap ENABLE TILT, then tilt to steer" : "Phone: tilt to steer Billy left and right") : "Phone: tilt works on the HTTPS version")
             : "Desktop: arrows or A / D to steer";
+          const controlsHintY = showTiltButton ? 690 : 660;
+          const bestY = showTiltButton ? 736 : 698;
 
           this.titleShadow = this.add.text(centerX + 4, 132 + 4, "BILLY BOUNCER", {
             fontFamily: "Georgia, serif",
@@ -962,14 +966,14 @@
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#EEDAA8", 2).setShadow(0, 2, "rgba(28,18,8,0.16)", 0);
 
-          this.controlsHint = this.add.text(centerX, 660, controlsHintText, {
+          this.controlsHint = this.add.text(centerX, controlsHintY, controlsHintText, {
             fontFamily: "Georgia, serif",
             fontSize: "15px",
             fontStyle: "italic",
             color: "#6A513A"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setShadow(0, 1, "rgba(28,18,8,0.10)", 0);
 
-          this.best = this.add.text(centerX, 698, bestScore > 0 ? `BEST: ${formatPoints(bestScore)} PTS` : "NO POSTERS YET", {
+          this.best = this.add.text(centerX, bestY, bestScore > 0 ? `BEST: ${formatPoints(bestScore)} PTS` : "NO POSTERS YET", {
             fontFamily: "Georgia, serif",
             fontSize: "20px",
             fontStyle: "bold",
@@ -985,7 +989,7 @@
           }
           this.input.keyboard.once("keydown-SPACE", () => this.startGame());
 
-          if (explicitTiltPermission && secureTilt) {
+          if (showTiltButton) {
             this.createMotionButton();
           }
         }
