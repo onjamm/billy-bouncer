@@ -120,13 +120,16 @@
       const OPENING_GAP_MIN = 92;
       const OPENING_GAP_MAX = 120;
       const OPENING_CHALLENGE_ALTITUDE = 1350;
-      const GAME_OVER_TITLE_Y = 248;
-      const GAME_OVER_LINE_Y = 332;
-      const GAME_OVER_SCORE_Y = 418;
-      const GAME_OVER_BUTTON_W = 236;
-      const GAME_OVER_BUTTON_H = 64;
-      const RIDE_AGAIN_Y = 500;
-      const SALOON_Y = 582;
+      const GAME_OVER_PANEL_W = 388;
+      const GAME_OVER_PANEL_H = 398;
+      const GAME_OVER_PANEL_Y = 430;
+      const GAME_OVER_TITLE_Y = 278;
+      const GAME_OVER_LINE_Y = 362;
+      const GAME_OVER_SCORE_Y = 430;
+      const GAME_OVER_BUTTON_W = 272;
+      const GAME_OVER_BUTTON_H = 62;
+      const RIDE_AGAIN_Y = 520;
+      const SALOON_Y = 606;
       const CULL_ABOVE_MARGIN = 420;
       const CULL_BELOW_MARGIN = 180;
       const SAFE_JUMP_VERTICAL_MARGIN = 20;
@@ -1451,7 +1454,8 @@
           this.overlay.setAlpha(0);
           this.overlay.setVisible(false);
 
-          const dim = this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, 0xF4E4BC, 0.88);
+          const dim = this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, 0xF4E4BC, 0.93);
+          const panelTint = this.add.rectangle(cx, GAME_OVER_PANEL_Y, GAME_OVER_PANEL_W - 12, GAME_OVER_PANEL_H - 20, 0xFFFFFF, 0.14);
           const gonerShadow = this.add.text(cx + 3, GAME_OVER_TITLE_Y + 3, "GOONER!", {
             fontFamily: "Georgia, serif",
             fontSize: "64px",
@@ -1469,27 +1473,26 @@
             fontSize: "24px",
             fontStyle: "italic",
             color: "#5E442C"
-          }).setOrigin(0.5).setStroke("#F4E4BC", 2);
+          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setWordWrapWidth(300).setAlign("center");
           this.finalScore = this.add.text(cx, GAME_OVER_SCORE_Y, "0 PTS", {
             fontFamily: "Georgia, serif",
             fontSize: "34px",
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#F4E4BC", 3).setShadow(0, 2, "rgba(28,18,8,0.14)", 0);
-
-          const rideBox = this.add.rectangle(cx, RIDE_AGAIN_Y, GAME_OVER_BUTTON_W, GAME_OVER_BUTTON_H, COLORS.parchment, 1).setStrokeStyle(4, COLORS.ink);
+          const rideBox = this.add.rectangle(cx, RIDE_AGAIN_Y, GAME_OVER_BUTTON_W, GAME_OVER_BUTTON_H, COLORS.parchment, 0.98).setStrokeStyle(3, COLORS.ink, 0.78);
           const rideText = this.add.text(cx, RIDE_AGAIN_Y, "RIDE AGAIN", {
             fontFamily: "Georgia, serif",
-            fontSize: "28px",
+            fontSize: "26px",
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#F4E4BC", 2);
           const rideHit = this.add.zone(cx, RIDE_AGAIN_Y, GAME_OVER_BUTTON_W, GAME_OVER_BUTTON_H).setInteractive({ useHandCursor: true });
 
-          const saloonBox = this.add.rectangle(cx, SALOON_Y, GAME_OVER_BUTTON_W, GAME_OVER_BUTTON_H, COLORS.parchment, 1).setStrokeStyle(4, COLORS.ink);
+          const saloonBox = this.add.rectangle(cx, SALOON_Y, GAME_OVER_BUTTON_W, GAME_OVER_BUTTON_H, COLORS.parchment, 0.98).setStrokeStyle(3, COLORS.ink, 0.78);
           const saloonText = this.add.text(cx, SALOON_Y, "SALOON", {
             fontFamily: "Georgia, serif",
-            fontSize: "28px",
+            fontSize: "26px",
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#F4E4BC", 2);
@@ -1511,7 +1514,7 @@
           rideHit.on("pointerup", activateRideAgain);
           saloonHit.on("pointerup", activateSaloon);
 
-          this.overlay.add([dim, gonerShadow, goner, this.gameOverLine, this.finalScore, rideBox, rideText, saloonBox, saloonText, rideHit, saloonHit]);
+          this.overlay.add([dim, panelTint, gonerShadow, goner, this.gameOverLine, this.finalScore, rideBox, rideText, saloonBox, saloonText, rideHit, saloonHit]);
           this.overlayButtons = {
             ride: { x: cx, y: RIDE_AGAIN_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H },
             saloon: { x: cx, y: SALOON_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H }
