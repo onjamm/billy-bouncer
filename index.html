@@ -1007,6 +1007,21 @@
           const controlsHintY = showTiltButton ? 690 : 660;
           const bestY = showTiltButton ? 732 : 698;
           const medalY = bestY + 28;
+          const mobileBoard = isTouchDevice();
+          const boardButtonX = GAME_W - (mobileBoard ? 66 : 72);
+          const boardButtonY = mobileBoard ? 48 : 52;
+          const boardButtonW = mobileBoard ? 98 : 112;
+          const boardButtonH = mobileBoard ? 36 : 38;
+          const boardPanelW = mobileBoard ? 232 : 146;
+          const boardPanelH = mobileBoard ? 182 : 176;
+          const boardPanelX = mobileBoard ? centerX : GAME_W - 72;
+          const boardPanelY = mobileBoard ? 314 : 262;
+          const boardPanelTop = boardPanelY - boardPanelH / 2;
+          const boardTitleY = boardPanelTop + 36;
+          const boardCloseY = boardPanelTop + 18;
+          const boardCloseX = boardPanelX + boardPanelW / 2 - 18;
+          const boardListY = boardPanelTop + 68;
+          const boardWrapW = mobileBoard ? 172 : 110;
 
           this.titleShadow = this.add.text(centerX + 4, 132 + 4, "BILLY BOUNCER", {
             fontFamily: "Georgia, serif",
@@ -1059,42 +1074,42 @@
             color: Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(bestScore)).rgba
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setShadow(0, 1, "rgba(28,18,8,0.10)", 0);
 
-          this.boardButtonBox = this.add.rectangle(GAME_W - 72, 52, 112, 38, COLORS.parchment, 0.96)
+          this.boardButtonBox = this.add.rectangle(boardButtonX, boardButtonY, boardButtonW, boardButtonH, COLORS.parchment, 0.96)
             .setStrokeStyle(3, COLORS.ink, 0.72);
-          this.boardButtonText = this.add.text(GAME_W - 72, 52, "BOARD", {
+          this.boardButtonText = this.add.text(boardButtonX, boardButtonY, "OUTLAWS", {
             fontFamily: "Georgia, serif",
-            fontSize: "18px",
+            fontSize: mobileBoard ? "15px" : "16px",
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#F4E4BC", 2);
 
-          this.boardPanel = this.add.rectangle(GAME_W - 72, 262, 146, 176, COLORS.parchment, 0.97)
+          this.boardPanel = this.add.rectangle(boardPanelX, boardPanelY, boardPanelW, boardPanelH, COLORS.parchment, 0.97)
             .setStrokeStyle(3, COLORS.ink, 0.5)
             .setVisible(false);
-          this.boardPanelTitle = this.add.text(GAME_W - 110, 202, "OUTLAW BOARD", {
+          this.boardPanelTitle = this.add.text(boardPanelX, boardTitleY, "OUTLAWS", {
             fontFamily: "Georgia, serif",
             fontSize: "15px",
             fontStyle: "bold",
             color: "#5E442C"
-          }).setOrigin(0, 0.5).setStroke("#F4E4BC", 2).setVisible(false);
-          this.boardCloseText = this.add.text(GAME_W - 24, 202, "x", {
+          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setVisible(false);
+          this.boardCloseText = this.add.text(boardCloseX, boardCloseY, "x", {
             fontFamily: "Georgia, serif",
             fontSize: "18px",
             fontStyle: "bold",
             color: "#5E442C"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setVisible(false);
-          this.boardList = this.add.text(GAME_W - 72, 228, canUseOnlineLeaderboard() ? "Loading leaderboard..." : "Online board lives on the Vercel build.", {
+          this.boardList = this.add.text(boardPanelX, boardListY, canUseOnlineLeaderboard() ? "Loading leaderboard..." : "Online board lives on the Vercel build.", {
             fontFamily: "Georgia, serif",
-            fontSize: "13px",
+            fontSize: mobileBoard ? "14px" : "13px",
             fontStyle: "italic",
             color: "#6A513A",
             align: "center",
             lineSpacing: 4
-          }).setOrigin(0.5, 0).setStroke("#F4E4BC", 2).setWordWrapWidth(110).setVisible(false);
+          }).setOrigin(0.5, 0).setStroke("#F4E4BC", 2).setWordWrapWidth(boardWrapW).setVisible(false);
 
-          this.boardButtonBounds = { x: GAME_W - 72, y: 52, w: 112, h: 38 };
-          this.boardCloseBounds = { x: GAME_W - 24, y: 202, w: 24, h: 24 };
-          this.boardPanelBounds = { x: GAME_W - 72, y: 262, w: 146, h: 176 };
+          this.boardButtonBounds = { x: boardButtonX, y: boardButtonY, w: boardButtonW, h: boardButtonH };
+          this.boardCloseBounds = { x: boardCloseX, y: boardCloseY, w: 24, h: 24 };
+          this.boardPanelBounds = { x: boardPanelX, y: boardPanelY, w: boardPanelW, h: boardPanelH };
           this.boardOpen = false;
 
           this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
