@@ -115,6 +115,7 @@
       const JETPACK_MS = 3000;
       const ROCKET_MS = 1500;
       const PROPELLER_MS = 1800;
+      const FRAGILE_RESPAWN_MS = 3200;
       const OPENING_PLATFORM_COUNT = 12;
       const OPENING_PLATFORM_PATTERN = ["normal", "movingH", "normal", "movingH", "normal", "movingH", "normal", "movingH", "normal", "movingH", "normal"];
       const OPENING_GAP_MIN = 92;
@@ -126,6 +127,7 @@
       const GAME_OVER_TITLE_Y = 278;
       const GAME_OVER_LINE_Y = 362;
       const GAME_OVER_SCORE_Y = 430;
+      const GAME_OVER_MEDAL_Y = 472;
       const GAME_OVER_BUTTON_W = 272;
       const GAME_OVER_BUTTON_H = 62;
       const RIDE_AGAIN_Y = 520;
@@ -290,6 +292,12 @@
         "A fine time to discover consequences."
       ];
 
+      const MEDAL_TIERS = [
+        { key: "bronze", label: "BRONZE", threshold: 20000, color: 0xA07820 },
+        { key: "silver", label: "SILVER", threshold: 50000, color: 0x909090 },
+        { key: "gold", label: "GOLD", threshold: 100000, color: 0xC9960A }
+      ];
+
       // ============================================================
       // Utility helpers
       // ============================================================
@@ -437,6 +445,37 @@
 
       function formatPoints(value) {
         return Math.max(0, Math.floor(value)).toLocaleString("en-US");
+      }
+
+      function getMedalStatus(score) {
+        let earned = null;
+        let next = null;
+
+        for (const tier of MEDAL_TIERS) {
+          if (score >= tier.threshold) {
+            earned = tier;
+          } else if (!next) {
+            next = tier;
+          }
+        }
+
+        return { earned, next };
+      }
+
+      function getMedalProgressText(score) {
+        const { earned, next } = getMedalStatus(score);
+        if (earned && next) {
+          return `${earned.label} MEDAL - ${next.label} AT ${formatPoints(next.threshold)} FT`;
+        }
+        if (earned) {
+          return `${earned.label} MEDAL EARNED`;
+        }
+        return `NEXT MEDAL: BRONZE AT ${formatPoints(MEDAL_TIERS[0].threshold)} FT`;
+      }
+
+      function getMedalDisplayColor(score) {
+        const { earned } = getMedalStatus(score);
+        return earned ? earned.color : COLORS.woodDark;
       }
 
       function bootDotsText(count) {
@@ -940,7 +979,8 @@
             ? (secureTilt ? (explicitTiltPermission ? "Phone: tap ENABLE TILT, then tilt to steer" : "Phone: tilt to steer Billy left and right") : "Phone: tilt works on the HTTPS version")
             : "Desktop: arrows or A / D to steer";
           const controlsHintY = showTiltButton ? 690 : 660;
-          const bestY = showTiltButton ? 736 : 698;
+          const bestY = showTiltButton ? 732 : 698;
+          const medalY = bestY + 28;
 
           this.titleShadow = this.add.text(centerX + 4, 132 + 4, "BILLY BOUNCER", {
             fontFamily: "Georgia, serif",
@@ -979,12 +1019,19 @@
             color: "#6A513A"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setShadow(0, 1, "rgba(28,18,8,0.10)", 0);
 
-          this.best = this.add.text(centerX, bestY, bestScore > 0 ? `BEST: ${formatPoints(bestScore)} PTS` : "NO POSTERS YET", {
+          this.best = this.add.text(centerX, bestY, bestScore > 0 ? `BEST: ${formatPoints(bestScore)} FT` : "NO POSTERS YET", {
             fontFamily: "Georgia, serif",
             fontSize: "20px",
             fontStyle: "bold",
             color: "#5E442C"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setShadow(0, 1, "rgba(28,18,8,0.12)", 0);
+
+          this.medalTrack = this.add.text(centerX, medalY, getMedalProgressText(bestScore), {
+            fontFamily: "Georgia, serif",
+            fontSize: "14px",
+            fontStyle: "bold",
+            color: Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(bestScore)).rgba
+          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setShadow(0, 1, "rgba(28,18,8,0.10)", 0);
 
           this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
           if (!explicitTiltPermission || !secureTilt) {
@@ -1061,7 +1108,8 @@
             this.subtitle,
             this.prompt,
             this.controlsHint,
-            this.best
+            this.best,
+            this.medalTrack
           ].forEach((obj) => {
             if (obj && obj.destroy) {
               obj.destroy();
@@ -1159,11 +1207,11 @@
           this.cursors = this.input.keyboard.createCursorKeys();
           this.keys = this.input.keyboard.addKeys("A,D,SPACE,ENTER");
           this.onPointerDown = (pointer) => {
-            void this.ensureMotionPermission();
             if (this.gameOverShown) {
               this.handleOverlayPointer(pointer);
               return;
             }
+            void this.ensureMotionPermission();
             this.tryShoot(pointer.worldX, pointer.worldY);
           };
           this.input.on("pointerdown", this.onPointerDown);
@@ -1474,12 +1522,19 @@
             fontStyle: "italic",
             color: "#5E442C"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setWordWrapWidth(300).setAlign("center");
-          this.finalScore = this.add.text(cx, GAME_OVER_SCORE_Y, "0 PTS", {
+          this.finalScore = this.add.text(cx, GAME_OVER_SCORE_Y, "0 FT", {
             fontFamily: "Georgia, serif",
             fontSize: "34px",
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#F4E4BC", 3).setShadow(0, 2, "rgba(28,18,8,0.14)", 0);
+          this.medalText = this.add.text(cx, GAME_OVER_MEDAL_Y, getMedalProgressText(0), {
+            fontFamily: "Georgia, serif",
+            fontSize: "15px",
+            fontStyle: "bold",
+            color: Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(0)).rgba,
+            align: "center"
+          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setWordWrapWidth(300).setShadow(0, 1, "rgba(28,18,8,0.10)", 0);
           const rideBox = this.add.rectangle(cx, RIDE_AGAIN_Y, GAME_OVER_BUTTON_W, GAME_OVER_BUTTON_H, COLORS.parchment, 0.98).setStrokeStyle(3, COLORS.ink, 0.78);
           const rideText = this.add.text(cx, RIDE_AGAIN_Y, "RIDE AGAIN", {
             fontFamily: "Georgia, serif",
@@ -1511,10 +1566,12 @@
             this.scene.start("menu");
           };
 
+          rideHit.on("pointerdown", activateRideAgain);
           rideHit.on("pointerup", activateRideAgain);
+          saloonHit.on("pointerdown", activateSaloon);
           saloonHit.on("pointerup", activateSaloon);
 
-          this.overlay.add([dim, panelTint, gonerShadow, goner, this.gameOverLine, this.finalScore, rideBox, rideText, saloonBox, saloonText, rideHit, saloonHit]);
+          this.overlay.add([dim, panelTint, gonerShadow, goner, this.gameOverLine, this.finalScore, this.medalText, rideBox, rideText, saloonBox, saloonText, rideHit, saloonHit]);
           this.overlayButtons = {
             ride: { x: cx, y: RIDE_AGAIN_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H },
             saloon: { x: cx, y: SALOON_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H }
@@ -1754,6 +1811,7 @@
             breakAt: 0,
             falling: false,
             fallSpeed: 0,
+            respawnAt: 0,
             explodeAt: 0,
             exploded: false,
             shakeUntil: 0
@@ -2256,12 +2314,29 @@
 
             if (platform.breakAt > 0 && time >= platform.breakAt) {
               platform.falling = true;
+              platform.active = false;
               platform.breakAt = 0;
+              platform.respawnAt = time + FRAGILE_RESPAWN_MS;
             }
 
             if (platform.falling) {
               platform.fallSpeed += 1200 * dt;
               platform.y += platform.fallSpeed * dt;
+              if (platform.y > this.cameras.main.scrollY + GAME_H + 80) {
+                platform.visible = false;
+              }
+            }
+
+            if (platform.type === "fragile" && platform.respawnAt > 0 && time >= platform.respawnAt) {
+              platform.respawnAt = 0;
+              platform.falling = false;
+              platform.fallSpeed = 0;
+              platform.breakAt = 0;
+              platform.shakeUntil = 0;
+              platform.x = platform.baseX;
+              platform.y = platform.baseY;
+              platform.active = true;
+              platform.visible = true;
             }
 
             if (platform.type === "vanish" && platform.hiddenUntil > 0 && time >= platform.hiddenUntil) {
@@ -2709,7 +2784,8 @@
           let topPlatform = null;
           for (let i = 0; i < this.platforms.length; i += 1) {
             const platform = this.platforms[i];
-            const keep = platform.y > topCull && platform.y < bottomCull && !platform.exploded;
+            const preserveFragileRespawn = platform.type === "fragile" && (platform.falling || platform.respawnAt > 0);
+            const keep = ((platform.y > topCull && platform.y < bottomCull) || preserveFragileRespawn) && !platform.exploded;
             if (keep) {
               this.platforms[platformWrite] = platform;
               platformWrite += 1;
@@ -2894,7 +2970,9 @@
           this.audio.stopAll();
           this.audio.gameOver();
           this.gameOverLine.setText(this.getRandomGameOverLine());
-          this.finalScore.setText(`${formatPoints(this.score)} PTS`);
+          this.finalScore.setText(`${formatPoints(this.score)} FT`);
+          this.medalText.setText(getMedalProgressText(this.score));
+          this.medalText.setColor(Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(this.score)).rgba);
           localStorage.setItem(BEST_SCORE_KEY, String(Math.max(this.bestScore, this.score)));
           this.overlay.setVisible(true);
           this.tweens.add({
@@ -2940,6 +3018,7 @@
           [
             this.overlay,
             this.finalScore,
+            this.medalText,
             this.scoreText,
             this.bgBase,
             this.bgBlend,
@@ -2955,6 +3034,7 @@
           });
           this.overlay = null;
           this.finalScore = null;
+          this.medalText = null;
           this.scoreText = null;
           this.bgBase = null;
           this.bgBlend = null;
