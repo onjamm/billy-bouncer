@@ -3269,7 +3269,8 @@
           for (let i = 0; i < this.platforms.length; i += 1) {
             const platform = this.platforms[i];
             const preserveFragileRespawn = platform.type === "fragile" && (platform.falling || platform.respawnAt > 0);
-            const keep = ((platform.y > topCull && platform.y < bottomCull) || preserveFragileRespawn) && !platform.exploded;
+            const preserveVanishRespawn = platform.type === "vanish" && platform.hiddenUntil > 0;
+            const keep = ((platform.y > topCull && platform.y < bottomCull) || preserveFragileRespawn || preserveVanishRespawn) && !platform.exploded;
             if (keep) {
               this.platforms[platformWrite] = platform;
               platformWrite += 1;
