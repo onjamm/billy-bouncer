@@ -3784,8 +3784,8 @@
 
         if (state.shield) {
           const pulse = 1 + Math.sin(time * 0.008) * 0.035;
-          const shellW = 74 * avgScale * pulse;
-          const shellH = 92 * avgScale * (1 - Math.sin(time * 0.008) * 0.02);
+          const shellW = 108 * avgScale * pulse;
+          const shellH = 135 * avgScale * (1 - Math.sin(time * 0.008) * 0.02);
           const shellY = y - 2 * avgScale;
           g.fillStyle(0x64A0DC, 0.12);
           g.fillEllipse(x, shellY, shellW, shellH);
@@ -3868,8 +3868,8 @@
 
         if (state.shield) {
           const pulse = 1 + Math.sin(time * 0.008) * 0.035;
-          const shellW = 74 * avgScale * pulse;
-          const shellH = 92 * avgScale * (1 - Math.sin(time * 0.008) * 0.02);
+          const shellW = 108 * avgScale * pulse;
+          const shellH = 135 * avgScale * (1 - Math.sin(time * 0.008) * 0.02);
           const shellY = y - 2 * avgScale;
           g.fillStyle(0x64A0DC, 0.12);
           g.fillEllipse(x, shellY, shellW, shellH);
@@ -3881,15 +3881,15 @@
           const glintOffset = Math.sin(time * 0.01) * 2;
           g.lineStyle(3, 0xFFFFFF, 0.42);
           g.beginPath();
-          g.moveTo(x - 17 * avgScale, shellY - 23 * avgScale + glintOffset);
-          g.lineTo(x - 8 * avgScale, shellY - 31 * avgScale + glintOffset);
-          g.lineTo(x + 2 * avgScale, shellY - 26 * avgScale + glintOffset);
+          g.moveTo(x - 25 * avgScale, shellY - 34 * avgScale + glintOffset);
+          g.lineTo(x - 12 * avgScale, shellY - 45 * avgScale + glintOffset);
+          g.lineTo(x + 3 * avgScale, shellY - 38 * avgScale + glintOffset);
           g.strokePath();
 
           g.lineStyle(2, 0xFFFFFF, 0.24);
           g.beginPath();
-          g.moveTo(x + 12 * avgScale, shellY + 18 * avgScale);
-          g.lineTo(x + 20 * avgScale, shellY + 11 * avgScale);
+          g.moveTo(x + 18 * avgScale, shellY + 26 * avgScale);
+          g.lineTo(x + 29 * avgScale, shellY + 16 * avgScale);
           g.strokePath();
         }
 
