@@ -1,7 +1,8 @@
 import { Redis } from "@upstash/redis";
 
 const LEADERBOARD_KEY = "billy-bouncer:leaderboard";
-const MAX_ENTRIES = 10;
+const MAX_DISPLAY_ENTRIES = 3;
+const MAX_SCAN_ENTRIES = 100;
 
 const redis =
   process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
@@ -30,28 +31,52 @@ function parseEntry(entry) {
   try {
     const parsed = JSON.parse(entry.member);
     return {
+      member: entry.member,
       name: sanitizeName(parsed.name || "OUTLAW") || "OUTLAW",
       score: Number(entry.score) || 0
     };
   } catch {
     return {
-      name: "OUTLAW",
+      member: entry.member,
+      name: sanitizeName(entry.member || "OUTLAW") || "OUTLAW",
       score: Number(entry.score) || 0
     };
   }
 }
 
-async function readEntries() {
+async function readRawEntries() {
   if (!redis) {
     return [];
   }
 
-  const raw = await redis.zrange(LEADERBOARD_KEY, 0, MAX_ENTRIES - 1, {
+  const raw = await redis.zrange(LEADERBOARD_KEY, 0, MAX_SCAN_ENTRIES - 1, {
     rev: true,
     withScores: true
   });
 
   return raw.map(parseEntry);
+}
+
+async function readEntries() {
+  const rawEntries = await readRawEntries();
+  const seen = new Set();
+  const deduped = [];
+
+  for (const entry of rawEntries) {
+    if (seen.has(entry.name)) {
+      continue;
+    }
+    seen.add(entry.name);
+    deduped.push({
+      name: entry.name,
+      score: entry.score
+    });
+    if (deduped.length >= MAX_DISPLAY_ENTRIES) {
+      break;
+    }
+  }
+
+  return deduped;
 }
 
 export default async function handler(request, response) {
@@ -85,15 +110,18 @@ export default async function handler(request, response) {
     return response.status(400).json({ ok: false, error: "Invalid score submission." });
   }
 
-  const member = JSON.stringify({
-    id: crypto.randomUUID(),
-    name,
-    at: Date.now()
-  });
+  const rawEntries = await readRawEntries();
+  const matchingEntries = rawEntries.filter((entry) => entry.name === name);
+  const bestScore = matchingEntries.reduce((best, entry) => Math.max(best, entry.score), 0);
+  const nextScore = Math.max(bestScore, score);
+
+  for (const entry of matchingEntries) {
+    await redis.zrem(LEADERBOARD_KEY, entry.member);
+  }
 
   await redis.zadd(LEADERBOARD_KEY, {
-    score,
-    member
+    score: nextScore,
+    member: name
   });
 
   const total = await redis.zcard(LEADERBOARD_KEY);

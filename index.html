@@ -498,7 +498,7 @@
           return "No outlaws posted yet.";
         }
         return entries
-          .slice(0, 5)
+          .slice(0, 3)
           .map((entry, index) => `${index + 1}. ${entry.name} - ${formatPoints(entry.score)} FT`)
           .join("\n");
       }
