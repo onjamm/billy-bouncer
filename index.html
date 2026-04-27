@@ -1045,7 +1045,7 @@
             color: "#6A513A"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setShadow(0, 1, "rgba(28,18,8,0.10)", 0);
 
-          this.best = this.add.text(centerX, bestY, bestScore > 0 ? `BEST: ${formatPoints(bestScore)} FT` : "NO POSTERS YET", {
+          this.best = this.add.text(centerX, bestY, bestScore > 0 ? `BEST: ${formatPoints(bestScore)} FT` : "BEST: 0 FT", {
             fontFamily: "Georgia, serif",
             fontSize: "20px",
             fontStyle: "bold",
@@ -1068,33 +1068,33 @@
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#F4E4BC", 2);
 
-          this.boardPanel = this.add.rectangle(GAME_W - 104, 170, 184, 176, COLORS.parchment, 0.97)
+          this.boardPanel = this.add.rectangle(GAME_W - 72, 262, 146, 176, COLORS.parchment, 0.97)
             .setStrokeStyle(3, COLORS.ink, 0.5)
             .setVisible(false);
-          this.boardPanelTitle = this.add.text(GAME_W - 104, 110, "OUTLAW BOARD", {
+          this.boardPanelTitle = this.add.text(GAME_W - 110, 202, "OUTLAW BOARD", {
             fontFamily: "Georgia, serif",
-            fontSize: "16px",
+            fontSize: "15px",
             fontStyle: "bold",
             color: "#5E442C"
-          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setVisible(false);
-          this.boardCloseText = this.add.text(GAME_W - 34, 110, "x", {
+          }).setOrigin(0, 0.5).setStroke("#F4E4BC", 2).setVisible(false);
+          this.boardCloseText = this.add.text(GAME_W - 24, 202, "x", {
             fontFamily: "Georgia, serif",
             fontSize: "18px",
             fontStyle: "bold",
             color: "#5E442C"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setVisible(false);
-          this.boardList = this.add.text(GAME_W - 104, 136, canUseOnlineLeaderboard() ? "Loading leaderboard..." : "Online board lives on the Vercel build.", {
+          this.boardList = this.add.text(GAME_W - 72, 228, canUseOnlineLeaderboard() ? "Loading leaderboard..." : "Online board lives on the Vercel build.", {
             fontFamily: "Georgia, serif",
             fontSize: "13px",
             fontStyle: "italic",
             color: "#6A513A",
             align: "center",
             lineSpacing: 4
-          }).setOrigin(0.5, 0).setStroke("#F4E4BC", 2).setWordWrapWidth(146).setVisible(false);
+          }).setOrigin(0.5, 0).setStroke("#F4E4BC", 2).setWordWrapWidth(110).setVisible(false);
 
           this.boardButtonBounds = { x: GAME_W - 72, y: 52, w: 112, h: 38 };
-          this.boardCloseBounds = { x: GAME_W - 34, y: 110, w: 24, h: 24 };
-          this.boardPanelBounds = { x: GAME_W - 104, y: 170, w: 184, h: 176 };
+          this.boardCloseBounds = { x: GAME_W - 24, y: 202, w: 24, h: 24 };
+          this.boardPanelBounds = { x: GAME_W - 72, y: 262, w: 146, h: 176 };
           this.boardOpen = false;
 
           this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -1362,6 +1362,7 @@
           this.lastShotAt = -SHOT_COOLDOWN;
           this.gameOverShown = false;
           this.pendingLeaderboardScore = 0;
+          this.leaderboardSubmitMessage = "";
           this.topSpawnY = START_PLATFORM_Y;
           this.lastPlatformX = GAME_W / 2;
           this.lastSpawnPlatform = null;
@@ -1378,6 +1379,7 @@
 
           this.createHUD();
           this.createGameOverOverlay();
+          this.createLeaderboardNamePrompt();
           this.seedWorld();
 
           this.player.body.velocity.y = JUMP_VELOCITY;
@@ -1696,7 +1698,7 @@
             if (!this.overlay || !this.overlay.visible || this.overlay.alpha < 0.9 || !this.pendingLeaderboardScore) {
               return;
             }
-            void this.promptForLeaderboardHandleAndSubmit();
+            this.showLeaderboardNamePrompt(this.pendingLeaderboardScore);
           };
 
           this.submitBoardHit.on("pointerdown", activateSubmitBoard);
@@ -1720,6 +1722,139 @@
           this.submitBoardText.setVisible(nextVisible);
           this.submitBoardHit.setVisible(nextVisible);
           this.submitBoardHit.input.enabled = nextVisible;
+        }
+
+        createLeaderboardNamePrompt() {
+          if (typeof document === "undefined") {
+            return;
+          }
+
+          const root = document.createElement("div");
+          root.style.position = "fixed";
+          root.style.left = "50%";
+          root.style.top = "50%";
+          root.style.transform = "translate(-50%, -50%)";
+          root.style.display = "none";
+          root.style.flexDirection = "column";
+          root.style.alignItems = "center";
+          root.style.gap = "10px";
+          root.style.width = "min(300px, calc(100vw - 48px))";
+          root.style.padding = "16px 18px";
+          root.style.background = "rgba(244, 228, 188, 0.97)";
+          root.style.border = "2px solid rgba(28, 18, 8, 0.5)";
+          root.style.boxShadow = "0 8px 18px rgba(28, 18, 8, 0.14)";
+          root.style.zIndex = "30";
+          root.style.borderRadius = "4px";
+          root.style.pointerEvents = "auto";
+          root.style.fontFamily = "Georgia, serif";
+
+          const title = document.createElement("div");
+          title.textContent = "OUTLAW NAME";
+          title.style.fontSize = "18px";
+          title.style.fontWeight = "700";
+          title.style.color = CSS.ink;
+          title.style.letterSpacing = "0.02em";
+
+          const caption = document.createElement("div");
+          caption.textContent = "Claim this run on the board.";
+          caption.style.fontSize = "14px";
+          caption.style.fontStyle = "italic";
+          caption.style.color = "#5E442C";
+          caption.style.textAlign = "center";
+
+          const input = document.createElement("input");
+          input.type = "text";
+          input.maxLength = 12;
+          input.placeholder = "BILLY";
+          input.autocomplete = "nickname";
+          input.spellcheck = false;
+          input.style.width = "100%";
+          input.style.boxSizing = "border-box";
+          input.style.padding = "12px 14px";
+          input.style.border = "2px solid rgba(28, 18, 8, 0.68)";
+          input.style.background = "#F8EDCF";
+          input.style.color = CSS.ink;
+          input.style.fontFamily = "Georgia, serif";
+          input.style.fontSize = "18px";
+          input.style.textAlign = "center";
+          input.style.outline = "none";
+
+          const message = document.createElement("div");
+          message.style.minHeight = "18px";
+          message.style.fontSize = "13px";
+          message.style.color = "#5E442C";
+          message.style.textAlign = "center";
+
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = "SAVE TO BOARD";
+          button.style.padding = "10px 18px";
+          button.style.border = "2px solid rgba(28, 18, 8, 0.78)";
+          button.style.background = "#F4E4BC";
+          button.style.color = CSS.ink;
+          button.style.fontFamily = "Georgia, serif";
+          button.style.fontSize = "18px";
+          button.style.fontWeight = "700";
+          button.style.cursor = "pointer";
+
+          root.append(title, caption, input, message, button);
+          document.body.appendChild(root);
+
+          this.leaderboardPromptEl = root;
+          this.leaderboardPromptInput = input;
+          this.leaderboardPromptMessage = message;
+          this.leaderboardPromptButton = button;
+
+          const submit = async () => {
+            await this.completeLeaderboardNameSubmit();
+          };
+
+          input.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void submit();
+            }
+          });
+          button.addEventListener("click", () => {
+            void submit();
+          });
+        }
+
+        positionLeaderboardNamePrompt() {
+          if (!this.leaderboardPromptEl || !this.game || !this.game.canvas) {
+            return;
+          }
+          const rect = this.game.canvas.getBoundingClientRect();
+          const scaleX = rect.width / GAME_W;
+          const scaleY = rect.height / GAME_H;
+          const left = rect.left + (GAME_W / 2) * scaleX;
+          const top = rect.top + (GAME_OVER_SUBMIT_Y + 34) * scaleY;
+          this.leaderboardPromptEl.style.left = `${left}px`;
+          this.leaderboardPromptEl.style.top = `${top}px`;
+        }
+
+        showLeaderboardNamePrompt(score) {
+          if (!this.leaderboardPromptEl || !this.leaderboardPromptInput) {
+            return;
+          }
+          this.pendingLeaderboardScore = score;
+          this.leaderboardSubmitMessage = "";
+          this.leaderboardPromptMessage.textContent = `Save ${formatPoints(score)} FT to the outlaw board.`;
+          this.leaderboardPromptInput.value = sanitizeLeaderboardName(localStorage.getItem(LEADERBOARD_HANDLE_KEY) || "");
+          this.positionLeaderboardNamePrompt();
+          this.leaderboardPromptEl.style.display = "flex";
+          this.leaderboardPromptInput.focus();
+          this.leaderboardPromptInput.select();
+        }
+
+        hideLeaderboardNamePrompt() {
+          if (!this.leaderboardPromptEl) {
+            return;
+          }
+          this.leaderboardPromptEl.style.display = "none";
+          if (this.leaderboardPromptMessage) {
+            this.leaderboardPromptMessage.textContent = "";
+          }
         }
 
         getRandomGameOverLine() {
@@ -3119,14 +3254,16 @@
           localStorage.setItem(LEADERBOARD_LAST_SUBMITTED_KEY, String(score));
         }
 
-        async promptForLeaderboardHandleAndSubmit() {
-          if (!this.pendingLeaderboardScore || typeof window === "undefined") {
+        async completeLeaderboardNameSubmit() {
+          if (!this.pendingLeaderboardScore || !this.leaderboardPromptInput) {
             return;
           }
 
-          const response = window.prompt("Enter a short outlaw name for the online board:", "");
-          const handle = sanitizeLeaderboardName(response || "");
+          const handle = sanitizeLeaderboardName(this.leaderboardPromptInput.value || "");
           if (!handle) {
+            if (this.leaderboardPromptMessage) {
+              this.leaderboardPromptMessage.textContent = "Pick a short outlaw name first.";
+            }
             return;
           }
 
@@ -3135,8 +3272,11 @@
             await this.submitLeaderboardScore(handle, this.pendingLeaderboardScore);
             this.pendingLeaderboardScore = 0;
             this.setLeaderboardSubmitVisible(false);
+            this.hideLeaderboardNamePrompt();
           } catch (error) {
-            // Leave the CTA available so the player can try again.
+            if (this.leaderboardPromptMessage) {
+              this.leaderboardPromptMessage.textContent = "Board save failed. Try that again.";
+            }
           }
         }
 
@@ -3144,6 +3284,7 @@
           if (!canUseOnlineLeaderboard() || score <= 0) {
             this.pendingLeaderboardScore = 0;
             this.setLeaderboardSubmitVisible(false);
+            this.hideLeaderboardNamePrompt();
             return;
           }
 
@@ -3151,13 +3292,14 @@
           if (score <= lastSubmitted) {
             this.pendingLeaderboardScore = 0;
             this.setLeaderboardSubmitVisible(false);
+            this.hideLeaderboardNamePrompt();
             return;
           }
 
           const handle = sanitizeLeaderboardName(localStorage.getItem(LEADERBOARD_HANDLE_KEY) || "");
           if (!handle) {
-            this.pendingLeaderboardScore = score;
-            this.setLeaderboardSubmitVisible(true);
+            this.setLeaderboardSubmitVisible(false);
+            this.showLeaderboardNamePrompt(score);
             return;
           }
 
@@ -3165,6 +3307,7 @@
             await this.submitLeaderboardScore(handle, score);
             this.pendingLeaderboardScore = 0;
             this.setLeaderboardSubmitVisible(false);
+            this.hideLeaderboardNamePrompt();
           } catch (error) {
             // Ignore online board failures in gameplay; the local run is the priority.
           }
@@ -3177,6 +3320,7 @@
           this.gameOverShown = true;
           this.pendingLeaderboardScore = 0;
           this.setLeaderboardSubmitVisible(false);
+          this.hideLeaderboardNamePrompt();
           this.audio.stopAll();
           this.audio.gameOver();
           this.gameOverLine.setText(this.getRandomGameOverLine());
@@ -3245,6 +3389,9 @@
               obj.destroy();
             }
           });
+          if (this.leaderboardPromptEl) {
+            this.leaderboardPromptEl.remove();
+          }
           this.overlay = null;
           this.finalScore = null;
           this.medalText = null;
