@@ -981,7 +981,7 @@
 
         if (starsAlpha > 0.01) {
           if (!scene.bgStars) {
-            scene.bgStars = Array.from({ length: 48 }, () => ({
+            scene.bgStars = Array.from({ length: IS_MOBILE ? 24 : 48 }, () => ({
               x: Phaser.Math.Between(14, GAME_W - 14),
               y: Phaser.Math.Between(18, GAME_H - 18),
               r: Phaser.Math.Between(1, 2)
@@ -1533,13 +1533,13 @@
         }
 
         isInUpdateBand(y, topMargin = UPDATE_MARGIN_TOP, bottomMargin = UPDATE_MARGIN_BOTTOM) {
-          const bounds = this.getViewportBounds(topMargin, bottomMargin);
-          return y >= bounds.top && y <= bounds.bottom;
+          const scrollY = this.cameras.main.scrollY;
+          return y >= scrollY - topMargin && y <= scrollY + GAME_H + bottomMargin;
         }
 
         isInRenderBand(y, topMargin = RENDER_MARGIN_TOP, bottomMargin = RENDER_MARGIN_BOTTOM) {
-          const bounds = this.getViewportBounds(topMargin, bottomMargin);
-          return y >= bounds.top && y <= bounds.bottom;
+          const scrollY = this.cameras.main.scrollY;
+          return y >= scrollY - topMargin && y <= scrollY + GAME_H + bottomMargin;
         }
 
         acquireStaticSprite(textureKey) {
@@ -3317,8 +3317,9 @@
           }
           this.blackHoles.length = holeWrite;
 
-          if (this.effects.length > 120) {
-            this.effects.splice(0, this.effects.length - 120);
+          const maxEffects = IS_MOBILE ? 60 : 120;
+          if (this.effects.length > maxEffects) {
+            this.effects.splice(0, this.effects.length - maxEffects);
           }
           if (this.pellets.length > MAX_PELLETS) {
             this.pellets.splice(0, this.pellets.length - MAX_PELLETS);
@@ -3618,12 +3619,14 @@
           drawSketchbookBackground(this, this.bg, altitude, this.cameras.main.scrollY, time);
           this.worldLayer.clear();
 
+          const vanishSin = Math.sin(time * 0.005);
+
           for (const platform of this.platforms) {
             if (this.syncPlatformSprite(platform, time)) {
               continue;
             }
             if (platform.visible && !platform.exploded && this.isInRenderBand(platform.y)) {
-              drawPlatform(this.worldLayer, platform, time);
+              drawPlatform(this.worldLayer, platform, time, vanishSin);
             }
           }
 
@@ -3684,7 +3687,8 @@
       // ============================================================
       // World drawing functions
       // ============================================================
-      function drawPlatform(g, platform, time) {
+      function drawPlatform(g, platform, time, vanishSin) {
+        if (vanishSin === undefined) vanishSin = Math.sin(time * 0.005);
         const wobbleX = platform.shakeUntil > time ? Math.sin(time * 0.05) * 3 : 0;
         const points = platform.noise.map((p, index) => {
           const dx = index === 0 || index === 3 ? -wobbleX : wobbleX;
@@ -3699,7 +3703,7 @@
           fillColor = platform.explodeAt > 0 && Math.floor(time / 90) % 2 === 0 ? COLORS.gold : 0x8B5A00;
         } else if (platform.type === "vanish") {
           fillColor = 0x648CC8;
-          fillAlpha = platform.hiddenUntil > 0 ? 0 : 0.3 + Math.sin(time * 0.005) * 0.225;
+          fillAlpha = platform.hiddenUntil > 0 ? 0 : 0.3 + vanishSin * 0.225;
         }
 
         g.fillStyle(fillColor, fillAlpha);
@@ -3714,7 +3718,7 @@
           g.strokePath();
         }
 
-        if (platform.type === "normal" || platform.type === "movingH" || platform.type === "movingV") {
+        if (!IS_MOBILE && (platform.type === "normal" || platform.type === "movingH" || platform.type === "movingV")) {
           g.lineStyle(2, COLORS.woodGrain, 0.45);
           platform.grainOffsets.forEach((offset) => {
             g.beginPath();
@@ -4388,12 +4392,16 @@
       // ============================================================
       // Phaser bootstrap
       // ============================================================
+      const IS_MOBILE = isTouchDevice();
       const game = new Phaser.Game({
         type: Phaser.AUTO,
         width: GAME_W,
         height: GAME_H,
         backgroundColor: CSS.parchment,
         parent: document.body,
+        antialias: false,
+        roundPixels: true,
+        resolution: IS_MOBILE ? Math.min(window.devicePixelRatio || 1, 2) : 1,
         physics: {
           default: "arcade",
           arcade: {
