@@ -1420,6 +1420,12 @@
             this.tryShoot(pointer.worldX, pointer.worldY);
           };
           this.input.on("pointerdown", this.onPointerDown);
+          this.onPointerUp = (pointer) => {
+            if (this.gameOverShown) {
+              this.handleOverlayPointer(pointer);
+            }
+          };
+          this.input.on("pointerup", this.onPointerUp);
           this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
           this.setupMotionControls();
 
@@ -1812,6 +1818,7 @@
         }
 
         revealGameOverOverlay() {
+          this.scale.refresh();
           this.overlay.setVisible(true);
           this.overlay.setAlpha(0);
           this.tweens.add({
@@ -3475,6 +3482,9 @@
           this.audio.stopAll();
           if (this.onPointerDown) {
             this.input.off("pointerdown", this.onPointerDown);
+          }
+          if (this.onPointerUp) {
+            this.input.off("pointerup", this.onPointerUp);
           }
           if (this.onDeviceOrientation) {
             window.removeEventListener("deviceorientation", this.onDeviceOrientation);
