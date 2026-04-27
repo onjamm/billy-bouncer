@@ -58,7 +58,7 @@ async function readRawEntries() {
 }
 
 async function readEntries() {
-  const rawEntries = await readRawEntries();
+  const rawEntries = (await readRawEntries()).filter((entry) => entry.score > 0);
   const seen = new Set();
   const deduped = [];
 

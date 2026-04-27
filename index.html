@@ -130,6 +130,7 @@
       const GAME_OVER_LINE_Y = 362;
       const GAME_OVER_SCORE_Y = 430;
       const GAME_OVER_MEDAL_Y = 472;
+      const GAME_OVER_SUBMIT_Y = 496;
       const GAME_OVER_BUTTON_W = 272;
       const GAME_OVER_BUTTON_H = 62;
       const RIDE_AGAIN_Y = 520;
@@ -1058,42 +1059,42 @@
             color: Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(bestScore)).rgba
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setShadow(0, 1, "rgba(28,18,8,0.10)", 0);
 
-          this.boardButtonBox = this.add.rectangle(GAME_W - 82, 52, 132, 40, COLORS.parchment, 0.96)
+          this.boardButtonBox = this.add.rectangle(GAME_W - 72, 52, 112, 38, COLORS.parchment, 0.96)
             .setStrokeStyle(3, COLORS.ink, 0.72);
-          this.boardButtonText = this.add.text(GAME_W - 82, 52, "BOARD", {
+          this.boardButtonText = this.add.text(GAME_W - 72, 52, "BOARD", {
             fontFamily: "Georgia, serif",
-            fontSize: "20px",
+            fontSize: "18px",
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#F4E4BC", 2);
 
-          this.boardPanel = this.add.rectangle(GAME_W - 138, 166, 236, 186, COLORS.parchment, 0.95)
+          this.boardPanel = this.add.rectangle(GAME_W - 104, 170, 184, 176, COLORS.parchment, 0.97)
             .setStrokeStyle(3, COLORS.ink, 0.5)
             .setVisible(false);
-          this.boardPanelTitle = this.add.text(GAME_W - 138, 104, "OUTLAW BOARD", {
+          this.boardPanelTitle = this.add.text(GAME_W - 104, 110, "OUTLAW BOARD", {
+            fontFamily: "Georgia, serif",
+            fontSize: "16px",
+            fontStyle: "bold",
+            color: "#5E442C"
+          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setVisible(false);
+          this.boardCloseText = this.add.text(GAME_W - 34, 110, "x", {
             fontFamily: "Georgia, serif",
             fontSize: "18px",
             fontStyle: "bold",
             color: "#5E442C"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setVisible(false);
-          this.boardCloseText = this.add.text(GAME_W - 38, 104, "x", {
+          this.boardList = this.add.text(GAME_W - 104, 136, canUseOnlineLeaderboard() ? "Loading leaderboard..." : "Online board lives on the Vercel build.", {
             fontFamily: "Georgia, serif",
-            fontSize: "20px",
-            fontStyle: "bold",
-            color: "#5E442C"
-          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setVisible(false);
-          this.boardList = this.add.text(GAME_W - 138, 132, canUseOnlineLeaderboard() ? "Loading leaderboard..." : "Online board lives on the Vercel build.", {
-            fontFamily: "Georgia, serif",
-            fontSize: "14px",
+            fontSize: "13px",
             fontStyle: "italic",
             color: "#6A513A",
             align: "center",
             lineSpacing: 4
-          }).setOrigin(0.5, 0).setStroke("#F4E4BC", 2).setWordWrapWidth(190).setVisible(false);
+          }).setOrigin(0.5, 0).setStroke("#F4E4BC", 2).setWordWrapWidth(146).setVisible(false);
 
-          this.boardButtonBounds = { x: GAME_W - 82, y: 52, w: 132, h: 40 };
-          this.boardCloseBounds = { x: GAME_W - 38, y: 104, w: 28, h: 28 };
-          this.boardPanelBounds = { x: GAME_W - 138, y: 166, w: 236, h: 186 };
+          this.boardButtonBounds = { x: GAME_W - 72, y: 52, w: 112, h: 38 };
+          this.boardCloseBounds = { x: GAME_W - 34, y: 110, w: 24, h: 24 };
+          this.boardPanelBounds = { x: GAME_W - 104, y: 170, w: 184, h: 176 };
           this.boardOpen = false;
 
           this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -1360,6 +1361,7 @@
           this.bestScore = Number(localStorage.getItem(BEST_SCORE_KEY) || 0);
           this.lastShotAt = -SHOT_COOLDOWN;
           this.gameOverShown = false;
+          this.pendingLeaderboardScore = 0;
           this.topSpawnY = START_PLATFORM_Y;
           this.lastPlatformX = GAME_W / 2;
           this.lastSpawnPlatform = null;
@@ -1653,6 +1655,13 @@
             color: Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(0)).rgba,
             align: "center"
           }).setOrigin(0.5).setStroke("#F4E4BC", 2).setWordWrapWidth(300).setShadow(0, 1, "rgba(28,18,8,0.10)", 0);
+          this.submitBoardText = this.add.text(cx, GAME_OVER_SUBMIT_Y, "SAVE SCORE TO BOARD", {
+            fontFamily: "Georgia, serif",
+            fontSize: "16px",
+            fontStyle: "bold",
+            color: "#5E442C"
+          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setVisible(false);
+          this.submitBoardHit = this.add.zone(cx, GAME_OVER_SUBMIT_Y, 240, 28).setInteractive({ useHandCursor: true }).setVisible(false);
           const rideBox = this.add.rectangle(cx, RIDE_AGAIN_Y, GAME_OVER_BUTTON_W, GAME_OVER_BUTTON_H, COLORS.parchment, 0.98).setStrokeStyle(3, COLORS.ink, 0.78);
           const rideText = this.add.text(cx, RIDE_AGAIN_Y, "RIDE AGAIN", {
             fontFamily: "Georgia, serif",
@@ -1683,18 +1692,34 @@
             }
             this.scene.start("menu");
           };
+          const activateSubmitBoard = () => {
+            if (!this.overlay || !this.overlay.visible || this.overlay.alpha < 0.9 || !this.pendingLeaderboardScore) {
+              return;
+            }
+            void this.promptForLeaderboardHandleAndSubmit();
+          };
 
+          this.submitBoardHit.on("pointerdown", activateSubmitBoard);
+          this.submitBoardHit.on("pointerup", activateSubmitBoard);
           rideHit.on("pointerdown", activateRideAgain);
           rideHit.on("pointerup", activateRideAgain);
           saloonHit.on("pointerdown", activateSaloon);
           saloonHit.on("pointerup", activateSaloon);
 
-          this.overlay.add([dim, panelTint, gonerShadow, goner, this.gameOverLine, this.finalScore, this.medalText, rideBox, rideText, saloonBox, saloonText, rideHit, saloonHit]);
+          this.overlay.add([dim, panelTint, gonerShadow, goner, this.gameOverLine, this.finalScore, this.medalText, this.submitBoardText, rideBox, rideText, saloonBox, saloonText, this.submitBoardHit, rideHit, saloonHit]);
           this.overlayButtons = {
             ride: { x: cx, y: RIDE_AGAIN_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H },
-            saloon: { x: cx, y: SALOON_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H }
+            saloon: { x: cx, y: SALOON_Y, w: GAME_OVER_BUTTON_W, h: GAME_OVER_BUTTON_H },
+            submit: { x: cx, y: GAME_OVER_SUBMIT_Y, w: 240, h: 28 }
           };
-          this.overlayHitAreas = { rideHit, saloonHit };
+          this.overlayHitAreas = { submitBoardHit: this.submitBoardHit, rideHit, saloonHit };
+        }
+
+        setLeaderboardSubmitVisible(visible) {
+          const nextVisible = !!visible;
+          this.submitBoardText.setVisible(nextVisible);
+          this.submitBoardHit.setVisible(nextVisible);
+          this.submitBoardHit.input.enabled = nextVisible;
         }
 
         getRandomGameOverLine() {
@@ -3080,38 +3105,66 @@
         // ------------------------------------------------------------
         // Game over handling
         // ------------------------------------------------------------
+        async submitLeaderboardScore(handle, score) {
+          const response = await fetch("/api/leaderboard", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ name: handle, score })
+          });
+          if (!response.ok) {
+            throw new Error(`Leaderboard returned ${response.status}`);
+          }
+          localStorage.setItem(LEADERBOARD_LAST_SUBMITTED_KEY, String(score));
+        }
+
+        async promptForLeaderboardHandleAndSubmit() {
+          if (!this.pendingLeaderboardScore || typeof window === "undefined") {
+            return;
+          }
+
+          const response = window.prompt("Enter a short outlaw name for the online board:", "");
+          const handle = sanitizeLeaderboardName(response || "");
+          if (!handle) {
+            return;
+          }
+
+          try {
+            localStorage.setItem(LEADERBOARD_HANDLE_KEY, handle);
+            await this.submitLeaderboardScore(handle, this.pendingLeaderboardScore);
+            this.pendingLeaderboardScore = 0;
+            this.setLeaderboardSubmitVisible(false);
+          } catch (error) {
+            // Leave the CTA available so the player can try again.
+          }
+        }
+
         async maybeSubmitLeaderboardScore(score) {
           if (!canUseOnlineLeaderboard() || score <= 0) {
+            this.pendingLeaderboardScore = 0;
+            this.setLeaderboardSubmitVisible(false);
             return;
           }
 
           const lastSubmitted = Number(localStorage.getItem(LEADERBOARD_LAST_SUBMITTED_KEY) || 0);
           if (score <= lastSubmitted) {
+            this.pendingLeaderboardScore = 0;
+            this.setLeaderboardSubmitVisible(false);
             return;
           }
 
-          let handle = sanitizeLeaderboardName(localStorage.getItem(LEADERBOARD_HANDLE_KEY) || "");
-          if (!handle && typeof window !== "undefined") {
-            const response = window.prompt("Enter a short outlaw name for the online board:", "");
-            handle = sanitizeLeaderboardName(response || "");
-            if (!handle) {
-              return;
-            }
-            localStorage.setItem(LEADERBOARD_HANDLE_KEY, handle);
+          const handle = sanitizeLeaderboardName(localStorage.getItem(LEADERBOARD_HANDLE_KEY) || "");
+          if (!handle) {
+            this.pendingLeaderboardScore = score;
+            this.setLeaderboardSubmitVisible(true);
+            return;
           }
 
           try {
-            const response = await fetch("/api/leaderboard", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({ name: handle, score })
-            });
-            if (!response.ok) {
-              throw new Error(`Leaderboard returned ${response.status}`);
-            }
-            localStorage.setItem(LEADERBOARD_LAST_SUBMITTED_KEY, String(score));
+            await this.submitLeaderboardScore(handle, score);
+            this.pendingLeaderboardScore = 0;
+            this.setLeaderboardSubmitVisible(false);
           } catch (error) {
             // Ignore online board failures in gameplay; the local run is the priority.
           }
@@ -3122,6 +3175,8 @@
             return;
           }
           this.gameOverShown = true;
+          this.pendingLeaderboardScore = 0;
+          this.setLeaderboardSubmitVisible(false);
           this.audio.stopAll();
           this.audio.gameOver();
           this.gameOverLine.setText(this.getRandomGameOverLine());
@@ -3176,6 +3231,7 @@
             this.overlay,
             this.finalScore,
             this.medalText,
+            this.submitBoardText,
             this.scoreText,
             this.bgBase,
             this.bgBlend,
