@@ -1,0 +1,9 @@
+{
+  "name": "billy-bouncer",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Billy Bouncer with a Vercel KV-backed outlaw leaderboard.",
+  "dependencies": {
+    "@upstash/redis": "^1.35.6"
+  }
+}
