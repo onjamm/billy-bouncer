@@ -1419,7 +1419,10 @@
               return;
             }
             void this.ensureMotionPermission();
-            this.tryShoot(pointer.worldX, pointer.worldY);
+            const aimPoint = this.cameras.main
+              ? this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+              : { x: pointer.x, y: pointer.y };
+            this.tryShoot(aimPoint.x, aimPoint.y);
           };
           this.input.on("pointerdown", this.onPointerDown);
           this.onPointerUp = (pointer) => {
