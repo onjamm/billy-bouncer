@@ -1055,6 +1055,7 @@
             .setScale(BANDIT_MENU_SCALE);
           this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
           this.starting = false;
+          this.motionButtonBusy = false;
 
           const bestScore = Number(localStorage.getItem(BEST_SCORE_KEY) || 0);
           const centerX = GAME_W / 2;
