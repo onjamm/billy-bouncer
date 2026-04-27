@@ -23,6 +23,7 @@
     canvas {
       display: block;
       margin: 0 auto;
+      touch-action: none;
     }
 
     .motion-permission-btn {
@@ -4345,7 +4346,9 @@
         },
         scale: {
           mode: Phaser.Scale.FIT,
-          autoCenter: Phaser.Scale.CENTER_BOTH
+          autoCenter: Phaser.Scale.CENTER_BOTH,
+          width: GAME_W,
+          height: GAME_H
         },
         scene: [MenuScene, GameScene]
       });
