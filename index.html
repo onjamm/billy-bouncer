@@ -124,12 +124,12 @@
       const OPENING_GAP_MAX = 120;
       const OPENING_CHALLENGE_ALTITUDE = 1350;
       const GAME_OVER_PANEL_W = 388;
-      const GAME_OVER_PANEL_H = 398;
-      const GAME_OVER_PANEL_Y = 430;
+      const GAME_OVER_PANEL_H = 472;
+      const GAME_OVER_PANEL_Y = 467;
       const GAME_OVER_TITLE_Y = 278;
       const GAME_OVER_LINE_Y = 362;
       const GAME_OVER_SCORE_Y = 430;
-      const GAME_OVER_MEDAL_Y = 472;
+      const GAME_OVER_MEDAL_Y = 682;
       const GAME_OVER_SUBMIT_Y = 496;
       const GAME_OVER_BUTTON_W = 272;
       const GAME_OVER_BUTTON_H = 62;
@@ -1378,6 +1378,7 @@
           this.gameOverShown = false;
           this.pendingLeaderboardScore = 0;
           this.leaderboardSubmitMessage = "";
+          this.awaitingLeaderboardName = false;
           this.topSpawnY = START_PLATFORM_Y;
           this.lastPlatformX = GAME_W / 2;
           this.lastSpawnPlatform = null;
@@ -1739,10 +1740,32 @@
           this.submitBoardHit.input.enabled = nextVisible;
         }
 
+        revealGameOverOverlay() {
+          this.overlay.setVisible(true);
+          this.overlay.setAlpha(0);
+          this.tweens.add({
+            targets: this.overlay,
+            alpha: 1,
+            duration: 400,
+            ease: "Quad.Out"
+          });
+        }
+
         createLeaderboardNamePrompt() {
           if (typeof document === "undefined") {
             return;
           }
+
+          const backdrop = document.createElement("div");
+          backdrop.style.position = "fixed";
+          backdrop.style.left = "0";
+          backdrop.style.top = "0";
+          backdrop.style.width = "100vw";
+          backdrop.style.height = "100vh";
+          backdrop.style.display = "none";
+          backdrop.style.background = "rgba(244, 228, 188, 0.88)";
+          backdrop.style.zIndex = "29";
+          backdrop.style.pointerEvents = "auto";
 
           const root = document.createElement("div");
           root.style.position = "fixed";
@@ -1763,6 +1786,22 @@
           root.style.pointerEvents = "auto";
           root.style.fontFamily = "Georgia, serif";
 
+          const close = document.createElement("button");
+          close.type = "button";
+          close.textContent = "x";
+          close.style.position = "absolute";
+          close.style.top = "8px";
+          close.style.right = "10px";
+          close.style.padding = "0";
+          close.style.border = "0";
+          close.style.background = "transparent";
+          close.style.color = "#5E442C";
+          close.style.fontFamily = "Georgia, serif";
+          close.style.fontSize = "22px";
+          close.style.fontWeight = "700";
+          close.style.lineHeight = "1";
+          close.style.cursor = "pointer";
+
           const title = document.createElement("div");
           title.textContent = "OUTLAW NAME";
           title.style.fontSize = "18px";
@@ -1780,7 +1819,7 @@
           const input = document.createElement("input");
           input.type = "text";
           input.maxLength = 12;
-          input.placeholder = "BILLY";
+          input.placeholder = "";
           input.autocomplete = "nickname";
           input.spellcheck = false;
           input.style.width = "100%";
@@ -1812,16 +1851,22 @@
           button.style.fontWeight = "700";
           button.style.cursor = "pointer";
 
-          root.append(title, caption, input, message, button);
+          root.append(close, title, caption, input, message, button);
+          document.body.appendChild(backdrop);
           document.body.appendChild(root);
 
+          this.leaderboardPromptBackdropEl = backdrop;
           this.leaderboardPromptEl = root;
+          this.leaderboardPromptClose = close;
           this.leaderboardPromptInput = input;
           this.leaderboardPromptMessage = message;
           this.leaderboardPromptButton = button;
 
           const submit = async () => {
             await this.completeLeaderboardNameSubmit();
+          };
+          const dismiss = () => {
+            this.dismissLeaderboardNamePrompt();
           };
 
           input.addEventListener("keydown", (event) => {
@@ -1833,19 +1878,15 @@
           button.addEventListener("click", () => {
             void submit();
           });
+          close.addEventListener("click", dismiss);
         }
 
         positionLeaderboardNamePrompt() {
-          if (!this.leaderboardPromptEl || !this.game || !this.game.canvas) {
+          if (!this.leaderboardPromptEl) {
             return;
           }
-          const rect = this.game.canvas.getBoundingClientRect();
-          const scaleX = rect.width / GAME_W;
-          const scaleY = rect.height / GAME_H;
-          const left = rect.left + (GAME_W / 2) * scaleX;
-          const top = rect.top + (GAME_OVER_SUBMIT_Y + 34) * scaleY;
-          this.leaderboardPromptEl.style.left = `${left}px`;
-          this.leaderboardPromptEl.style.top = `${top}px`;
+          this.leaderboardPromptEl.style.left = "50%";
+          this.leaderboardPromptEl.style.top = "50%";
         }
 
         showLeaderboardNamePrompt(score) {
@@ -1853,10 +1894,14 @@
             return;
           }
           this.pendingLeaderboardScore = score;
+          this.awaitingLeaderboardName = true;
           this.leaderboardSubmitMessage = "";
           this.leaderboardPromptMessage.textContent = `Save ${formatPoints(score)} FT to the outlaw board.`;
           this.leaderboardPromptInput.value = sanitizeLeaderboardName(localStorage.getItem(LEADERBOARD_HANDLE_KEY) || "");
           this.positionLeaderboardNamePrompt();
+          if (this.leaderboardPromptBackdropEl) {
+            this.leaderboardPromptBackdropEl.style.display = "block";
+          }
           this.leaderboardPromptEl.style.display = "flex";
           this.leaderboardPromptInput.focus();
           this.leaderboardPromptInput.select();
@@ -1866,9 +1911,22 @@
           if (!this.leaderboardPromptEl) {
             return;
           }
+          this.awaitingLeaderboardName = false;
+          if (this.leaderboardPromptBackdropEl) {
+            this.leaderboardPromptBackdropEl.style.display = "none";
+          }
           this.leaderboardPromptEl.style.display = "none";
           if (this.leaderboardPromptMessage) {
             this.leaderboardPromptMessage.textContent = "";
+          }
+        }
+
+        dismissLeaderboardNamePrompt() {
+          this.pendingLeaderboardScore = 0;
+          this.setLeaderboardSubmitVisible(false);
+          this.hideLeaderboardNamePrompt();
+          if (this.gameOverShown && this.overlay && !this.overlay.visible) {
+            this.revealGameOverOverlay();
           }
         }
 
@@ -3283,11 +3341,12 @@
           }
 
           try {
-            localStorage.setItem(LEADERBOARD_HANDLE_KEY, handle);
             await this.submitLeaderboardScore(handle, this.pendingLeaderboardScore);
+            localStorage.setItem(LEADERBOARD_HANDLE_KEY, handle);
             this.pendingLeaderboardScore = 0;
             this.setLeaderboardSubmitVisible(false);
             this.hideLeaderboardNamePrompt();
+            this.revealGameOverOverlay();
           } catch (error) {
             if (this.leaderboardPromptMessage) {
               this.leaderboardPromptMessage.textContent = "Board save failed. Try that again.";
@@ -3310,22 +3369,8 @@
             this.hideLeaderboardNamePrompt();
             return;
           }
-
-          const handle = sanitizeLeaderboardName(localStorage.getItem(LEADERBOARD_HANDLE_KEY) || "");
-          if (!handle) {
-            this.setLeaderboardSubmitVisible(false);
-            this.showLeaderboardNamePrompt(score);
-            return;
-          }
-
-          try {
-            await this.submitLeaderboardScore(handle, score);
-            this.pendingLeaderboardScore = 0;
-            this.setLeaderboardSubmitVisible(false);
-            this.hideLeaderboardNamePrompt();
-          } catch (error) {
-            // Ignore online board failures in gameplay; the local run is the priority.
-          }
+          this.setLeaderboardSubmitVisible(false);
+          this.showLeaderboardNamePrompt(score);
         }
 
         triggerGameOver() {
@@ -3336,6 +3381,8 @@
           this.pendingLeaderboardScore = 0;
           this.setLeaderboardSubmitVisible(false);
           this.hideLeaderboardNamePrompt();
+          this.physics.world.pause();
+          this.player.body.setVelocity(0, 0);
           this.audio.stopAll();
           this.audio.gameOver();
           this.gameOverLine.setText(this.getRandomGameOverLine());
@@ -3344,13 +3391,12 @@
           this.medalText.setColor(Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(this.score)).rgba);
           const nextBest = Math.max(this.bestScore, this.score);
           localStorage.setItem(BEST_SCORE_KEY, String(nextBest));
-          this.overlay.setVisible(true);
-          this.tweens.add({
-            targets: this.overlay,
-            alpha: 1,
-            duration: 400,
-            ease: "Quad.Out"
-          });
+          const lastSubmitted = Number(localStorage.getItem(LEADERBOARD_LAST_SUBMITTED_KEY) || 0);
+          if (canUseOnlineLeaderboard() && this.score > 0 && this.score > lastSubmitted) {
+            this.showLeaderboardNamePrompt(this.score);
+            return;
+          }
+          this.revealGameOverOverlay();
           void this.maybeSubmitLeaderboardScore(this.score);
         }
 
@@ -3406,6 +3452,9 @@
           });
           if (this.leaderboardPromptEl) {
             this.leaderboardPromptEl.remove();
+          }
+          if (this.leaderboardPromptBackdropEl) {
+            this.leaderboardPromptBackdropEl.remove();
           }
           this.overlay = null;
           this.finalScore = null;
