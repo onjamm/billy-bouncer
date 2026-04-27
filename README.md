@@ -22,14 +22,13 @@
 `Billy Bouncer` is a fully playable endless vertical jumper inspired by the feel of Doodle Jump, rebuilt with a custom western/frontier skin and a deliberately constrained tech stack:
 
 - one `index.html`
+- a small `assets/characters/bandit` sprite set for Billy's directional poses
 - Phaser 3 from CDN
 - Arcade physics
 - no build tools
-- no asset folders
-- no image files for the game itself
 - no audio files
 
-Everything in the playable game is drawn procedurally with canvas and Phaser graphics, and the sound effects are synthesized in code through the Web Audio API.
+Most of the playable game is still drawn procedurally with canvas and Phaser graphics, while Billy's hero sprite uses PixelLab-generated directional PNGs. Sound effects are synthesized in code through the Web Audio API.
 
 ## Core Feel
 
@@ -123,6 +122,7 @@ Billy handles jumping on his own. Your whole job is route choice, horizontal con
 This repo is intentionally tiny:
 
 - [index.html](./index.html) contains the full game
+- [assets/characters/bandit](./assets/characters/bandit) contains the active directional Billy sprite set (south/east/west)
 - [docs/billy-bouncer-gameplay.png](./docs/billy-bouncer-gameplay.png) is the README screenshot
 
 The game is designed to run immediately by opening `index.html` in Chrome, and it also deploys cleanly to static hosting.

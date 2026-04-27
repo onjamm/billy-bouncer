@@ -300,6 +300,21 @@
         { key: "silver", label: "SILVER", threshold: 50000, color: 0x909090 },
         { key: "gold", label: "GOLD", threshold: 100000, color: 0xC9960A }
       ];
+      const BANDIT_TEXTURE_KEYS = {
+        neutral: "bandit-sprite-neutral",
+        left: "bandit-sprite-left",
+        right: "bandit-sprite-right"
+      };
+      const BANDIT_TEXTURE_PATHS = {
+        neutral: "assets/characters/bandit/south.png",
+        left: "assets/characters/bandit/west.png",
+        right: "assets/characters/bandit/east.png"
+      };
+      const BANDIT_SPRITE_ORIGIN_Y = 0.62;
+      const BANDIT_MENU_SCALE = 1.52;
+      const BANDIT_GAME_SCALE = 1.5;
+      const BANDIT_MENU_Y_OFFSET = 8;
+      const BANDIT_GAME_Y_OFFSET = 4;
 
       // ============================================================
       // Utility helpers
@@ -315,6 +330,42 @@
       function map(value, inMin, inMax, outMin, outMax) {
         const t = clamp((value - inMin) / (inMax - inMin), 0, 1);
         return lerp(outMin, outMax, t);
+      }
+
+      function preloadBanditTextures(scene) {
+        for (const [variant, textureKey] of Object.entries(BANDIT_TEXTURE_KEYS)) {
+          if (!scene.textures.exists(textureKey)) {
+            scene.load.image(textureKey, BANDIT_TEXTURE_PATHS[variant]);
+          }
+        }
+      }
+
+      function applyBanditTextureFilter(scene) {
+        for (const textureKey of Object.values(BANDIT_TEXTURE_KEYS)) {
+          const texture = scene.textures.get(textureKey);
+          if (texture && texture.setFilter) {
+            texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+          }
+        }
+      }
+
+      function getBanditTextureKeyForState(state) {
+        const moveIntent = clamp((state.vx || 0) / PLAYER_SPEED, -1, 1);
+        if (Math.abs(moveIntent) < 0.08) {
+          return BANDIT_TEXTURE_KEYS.neutral;
+        }
+        return moveIntent < 0 ? BANDIT_TEXTURE_KEYS.left : BANDIT_TEXTURE_KEYS.right;
+      }
+
+      function syncBanditSprite(sprite, state, time, baseScale, yOffset = 0) {
+        if (!sprite) {
+          return;
+        }
+
+        sprite.setTexture(getBanditTextureKeyForState(state));
+        sprite.setPosition(state.x, state.y + yOffset);
+        sprite.setScale(baseScale * state.scaleX, baseScale * state.scaleY);
+        sprite.setAlpha(state.flash && Math.floor(time / 50) % 2 === 0 ? 0.5 : 1);
       }
 
       function rgba(color, alpha) {
@@ -987,11 +1038,20 @@
           super("menu");
         }
 
+        preload() {
+          preloadBanditTextures(this);
+        }
+
         create() {
           this.audio = this.game.audioEngine || new AudioEngine();
           this.game.audioEngine = this.audio;
           this.bg = this.add.graphics().setScrollFactor(0);
           this.preview = this.add.graphics();
+          applyBanditTextureFilter(this);
+          this.previewBandit = this.add.image(GAME_W / 2, 0, BANDIT_TEXTURE_KEYS.neutral)
+            .setDepth(16)
+            .setOrigin(0.5, BANDIT_SPRITE_ORIGIN_Y)
+            .setScale(BANDIT_MENU_SCALE);
           this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
           this.starting = false;
 
@@ -1189,6 +1249,7 @@
           [
             this.bg,
             this.preview,
+            this.previewBandit,
             this.titleShadow,
             this.title,
             this.subtitle,
@@ -1209,6 +1270,7 @@
           });
           this.bg = null;
           this.preview = null;
+          this.previewBandit = null;
         }
 
         async startGame(forceMotionGranted) {
@@ -1300,7 +1362,7 @@
             grainOffsets: [-8, 0, 8],
             nails: [-34, 30]
           }, time);
-          drawBandit(this.preview, previewState, time);
+          syncBanditSprite(this.previewBandit, previewState, time, BANDIT_MENU_SCALE, BANDIT_MENU_Y_OFFSET);
         }
       }
 
@@ -1314,6 +1376,10 @@
 
         init(data) {
           this.motionGranted = !!(data && data.motionGranted);
+        }
+
+        preload() {
+          preloadBanditTextures(this);
         }
 
         create() {
@@ -1331,6 +1397,11 @@
           this.bg = this.add.graphics().setScrollFactor(0).setDepth(-20);
           this.worldLayer = this.add.graphics().setDepth(10);
           this.uiLayer = this.add.graphics().setScrollFactor(0).setDepth(100);
+          applyBanditTextureFilter(this);
+          this.playerSprite = this.add.image(GAME_W / 2, START_Y, BANDIT_TEXTURE_KEYS.neutral)
+            .setDepth(14)
+            .setOrigin(0.5, BANDIT_SPRITE_ORIGIN_Y)
+            .setScale(BANDIT_GAME_SCALE);
 
           // Invisible physics host for the player
           this.player = this.add.rectangle(GAME_W / 2, START_Y, PLAYER_BODY_W, PLAYER_BODY_H, 0xffffff, 0);
@@ -3444,6 +3515,7 @@
             this.worldLayer,
             this.uiLayer,
             this.player,
+            this.playerSprite,
             this.textureBuilder
           ].forEach((obj) => {
             if (obj && obj.destroy) {
@@ -3466,6 +3538,7 @@
           this.worldLayer = null;
           this.uiLayer = null;
           this.player = null;
+          this.playerSprite = null;
           this.textureBuilder = null;
         }
 
@@ -3514,7 +3587,7 @@
             }
           }
 
-          drawBandit(this.worldLayer, {
+          const playerDrawState = {
             x: this.player.x,
             y: this.player.y,
             vx: this.player.body.velocity.x,
@@ -3528,7 +3601,9 @@
             shield: this.playerState.shield,
             jetpack: this.time.now < this.playerState.jetpackUntil,
             rocket: this.time.now < this.playerState.rocketUntil
-          }, time);
+          };
+          syncBanditSprite(this.playerSprite, playerDrawState, time, BANDIT_GAME_SCALE, BANDIT_GAME_Y_OFFSET);
+          drawBanditFx(this.worldLayer, playerDrawState, time);
 
           this.drawHUDDecor(time);
         }
@@ -3626,6 +3701,71 @@
           const springX = platform.x + platform.spring.xOffset;
           const top = platform.y - platform.h / 2 - 1;
           drawSpringShape(g, springX, top - 8, 0.9);
+        }
+      }
+
+      function drawBanditFx(g, state, time) {
+        const x = state.x;
+        const y = state.y + BANDIT_GAME_Y_OFFSET;
+        const avgScale = (state.scaleX + state.scaleY) * 0.5;
+        const facing = state.dir < 0 ? -1 : 1;
+
+        if (state.shield) {
+          const pulse = 1 + Math.sin(time * 0.008) * 0.035;
+          const shellW = 74 * avgScale * pulse;
+          const shellH = 92 * avgScale * (1 - Math.sin(time * 0.008) * 0.02);
+          const shellY = y - 2 * avgScale;
+          g.fillStyle(0x64A0DC, 0.12);
+          g.fillEllipse(x, shellY, shellW, shellH);
+          g.lineStyle(3, 0xFFFFFF, 0.34);
+          g.strokeEllipse(x, shellY, shellW, shellH);
+          g.lineStyle(2, 0x64A0DC, 0.65);
+          g.strokeEllipse(x, shellY, shellW - 6 * avgScale, shellH - 8 * avgScale);
+        }
+
+        if (state.jetpack) {
+          for (let i = 0; i < 4; i += 1) {
+            g.fillStyle(COLORS.poncho, 0.2 + i * 0.08);
+            g.fillCircle(x - 8 + i * 5, y + 24 + i * 7, (8 + i * 2) * avgScale);
+          }
+        }
+
+        if (state.rocket) {
+          g.fillStyle(COLORS.gold, 0.78);
+          g.fillCircle(x - 4 * facing, y + 22, 8 * avgScale);
+          g.fillStyle(COLORS.rust, 1);
+          g.fillTriangle(x - 12 * facing, y + 16, x - 4 * facing, y, x + 4 * facing, y + 16);
+          g.lineStyle(2, COLORS.ink, 1);
+          g.strokeTriangle(x - 12 * facing, y + 16, x - 4 * facing, y, x + 4 * facing, y + 16);
+        }
+
+        if (state.propeller) {
+          const rotorAngle = time * 0.04;
+          const rotorDx = Math.cos(rotorAngle) * 13;
+          const rotorDy = Math.sin(rotorAngle) * 3;
+          g.lineStyle(4, COLORS.ink, 1);
+          g.beginPath();
+          g.moveTo(x, y - 38);
+          g.lineTo(x, y - 25);
+          g.strokePath();
+          g.beginPath();
+          g.moveTo(x - rotorDx, y - 38 - rotorDy);
+          g.lineTo(x + rotorDx, y - 38 + rotorDy);
+          g.strokePath();
+          g.lineStyle(3, COLORS.teal, 0.9);
+          g.beginPath();
+          g.moveTo(x - 11, y - 39);
+          g.lineTo(x + 11, y - 39);
+          g.strokePath();
+        }
+
+        if (state.shooting) {
+          drawStar(g, x + facing * 27, y + 8, 2 * avgScale, 7 * avgScale, 4, Math.PI / 4, COLORS.gold, COLORS.gold, 1);
+        }
+
+        if (state.flash) {
+          g.fillStyle(COLORS.white, 0.3);
+          g.fillCircle(x, y, 30 * avgScale);
         }
       }
 
