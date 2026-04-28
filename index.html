@@ -3662,6 +3662,8 @@
               this.stretchLaunch();
             } else if (pickup.type === "jetpack") {
               this.playerState.jetpackUntil = time + JETPACK_MS;
+              // Ensure jetpack is always invincible even if other code paths only check invincibleUntil.
+              this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.jetpackUntil);
             } else if (pickup.type === "rocket") {
               this.playerState.rocketUntil = time + ROCKET_MS;
             } else if (pickup.type === "propeller") {
@@ -4441,12 +4443,12 @@
               // Anchor to the rendered sprite bounds so it stays correct if we tweak art/scale.
               const sb = spriteBounds;
               // Use edge + inset rather than center-based scaling to avoid "floating in space".
-              const inset = 0.3073; // % into the sprite from the back edge (~3.5px closer at typical sprite widths)
+              const inset = 0.317; // % into the sprite from the back edge (~2px closer at typical sprite widths)
               const packX = sb
                 ? (facing > 0 ? sb.left + sb.width * inset : sb.right - sb.width * inset)
                 : playerDrawState.x - facing * 18 * renderScale;
               // Lower: center of pack sits mid-back, so the top reads near the shoulder blade.
-              const packY = sb ? sb.top + sb.height * 0.60 : playerDrawState.y + BANDIT_GAME_Y_OFFSET - 14 * renderScale;
+              const packY = sb ? sb.top + sb.height * 0.57 : playerDrawState.y + BANDIT_GAME_Y_OFFSET - 16 * renderScale;
               const packScale = renderScale * 0.62;
               const frame = Math.floor(time / 70) % 4;
               this.jetpackSprite
