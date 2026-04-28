@@ -2300,12 +2300,27 @@
           return true;
         }
 
-        syncPickupSprite(pickup) {
+        syncPickupSprite(pickup, time) {
           const visible = this.isInRenderBand(pickup.y);
           if (!visible) {
             if (pickup.sprite) {
               pickup.sprite.setVisible(false);
             }
+            return;
+          }
+
+          if (pickup.type === "jetpack") {
+            // Jetpack is a spritesheet; render as a Sprite so we show a single 32x32 frame.
+            if (!pickup.sprite || !pickup.sprite.setFrame) {
+              if (pickup.sprite && pickup.sprite.destroy) pickup.sprite.destroy();
+              pickup.sprite = this.add.sprite(pickup.x, pickup.y, JETPACK_SHEET_KEY, 0)
+                .setOrigin(0.5)
+                .setDepth(6);
+            }
+            const frame = Math.floor(time / 80) % 4;
+            pickup.sprite.setFrame(frame);
+            pickup.sprite.setPosition(pickup.x, pickup.y);
+            pickup.sprite.setVisible(true);
             return;
           }
 
@@ -4374,7 +4389,7 @@
           }
 
           for (const pickup of this.pickups) {
-            this.syncPickupSprite(pickup);
+            this.syncPickupSprite(pickup, time);
           }
 
           for (const enemy of this.enemies) {
@@ -4411,16 +4426,17 @@
             rocket: this.time.now < this.playerState.rocketUntil
           };
           syncBanditSprite(this.playerSprite, playerDrawState, time, BANDIT_GAME_SCALE, BANDIT_GAME_Y_OFFSET);
+          const spriteBounds = this.playerSprite && this.playerSprite.getBounds ? this.playerSprite.getBounds() : null;
           // Jetpack attachment: snap to Billy's back at a believable height.
           if (this.jetpackSprite) {
             if (playerDrawState.jetpack) {
               const facing = playerDrawState.dir < 0 ? -1 : 1;
               const avgScale = (playerDrawState.scaleX + playerDrawState.scaleY) * 0.5;
               const renderScale = BANDIT_GAME_SCALE * avgScale;
-              // Anchor relative to Billy's sprite origin and scale (tuned visually).
-              // Tuned so the pack sits on the shoulder blades, not on the belt/hips.
-              const packX = playerDrawState.x - facing * 24 * renderScale;
-              const packY = playerDrawState.y + BANDIT_GAME_Y_OFFSET - 28 * renderScale;
+              // Anchor to the rendered sprite bounds so it stays correct if we tweak art/scale.
+              const sb = spriteBounds;
+              const packX = sb ? sb.centerX - facing * sb.width * 0.28 : playerDrawState.x - facing * 24 * renderScale;
+              const packY = sb ? sb.top + sb.height * 0.54 : playerDrawState.y + BANDIT_GAME_Y_OFFSET - 18 * renderScale;
               const packScale = renderScale * 0.62;
               const frame = Math.floor(time / 70) % 4;
               this.jetpackSprite
@@ -4435,7 +4451,6 @@
           }
 
           drawBanditFx(this.worldLayer, playerDrawState, time);
-          const spriteBounds = this.playerSprite && this.playerSprite.getBounds ? this.playerSprite.getBounds() : null;
           drawBanditOverlayFx(this.playerOverlayLayer, playerDrawState, time, spriteBounds);
 
           this.drawHUDDecor(time);
