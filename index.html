@@ -1398,6 +1398,7 @@
           this.bgBlend = this.add.image(GAME_W / 2, GAME_H / 2, this.backgroundBaseKeys.parchment).setScrollFactor(0).setDepth(-29).setVisible(false).setAlpha(0);
           this.bg = this.add.graphics().setScrollFactor(0).setDepth(-20);
           this.worldLayer = this.add.graphics().setDepth(10);
+          this.playerOverlayLayer = this.add.graphics().setDepth(16);
           this.uiLayer = this.add.graphics().setScrollFactor(0).setDepth(100);
           applyBanditTextureFilter(this);
           this.playerSprite = this.add.image(GAME_W / 2, START_Y, BANDIT_TEXTURE_KEYS.neutral)
@@ -3617,11 +3618,12 @@
             this.scoreText,
             this.bgBase,
             this.bgBlend,
-            this.bg,
-            this.worldLayer,
-            this.uiLayer,
-            this.player,
-            this.playerSprite,
+              this.bg,
+              this.worldLayer,
+              this.playerOverlayLayer,
+              this.uiLayer,
+              this.player,
+              this.playerSprite,
             this.textureBuilder
           ].forEach((obj) => {
             if (obj && obj.destroy) {
@@ -3642,6 +3644,7 @@
           this.bgBlend = null;
           this.bg = null;
           this.worldLayer = null;
+          this.playerOverlayLayer = null;
           this.uiLayer = null;
           this.player = null;
           this.playerSprite = null;
@@ -3655,6 +3658,7 @@
           this.updateBackgroundBase(altitude);
           drawSketchbookBackground(this, this.bg, altitude, this.cameras.main.scrollY, time);
           this.worldLayer.clear();
+          this.playerOverlayLayer.clear();
 
           const vanishSin = Math.sin(time * 0.005);
 
@@ -3712,6 +3716,7 @@
           };
           syncBanditSprite(this.playerSprite, playerDrawState, time, BANDIT_GAME_SCALE, BANDIT_GAME_Y_OFFSET);
           drawBanditFx(this.worldLayer, playerDrawState, time);
+          drawBanditOverlayFx(this.playerOverlayLayer, playerDrawState, time);
 
           this.drawHUDDecor(time);
         }
@@ -3848,26 +3853,6 @@
           g.strokeTriangle(x - 12 * facing, y + 16, x - 4 * facing, y, x + 4 * facing, y + 16);
         }
 
-        if (state.propeller) {
-          const rotorAngle = time * 0.04;
-          const rotorDx = Math.cos(rotorAngle) * 13;
-          const rotorDy = Math.sin(rotorAngle) * 3;
-          g.lineStyle(4, COLORS.ink, 1);
-          g.beginPath();
-          g.moveTo(x, y - 38);
-          g.lineTo(x, y - 25);
-          g.strokePath();
-          g.beginPath();
-          g.moveTo(x - rotorDx, y - 38 - rotorDy);
-          g.lineTo(x + rotorDx, y - 38 + rotorDy);
-          g.strokePath();
-          g.lineStyle(3, COLORS.teal, 0.9);
-          g.beginPath();
-          g.moveTo(x - 11, y - 39);
-          g.lineTo(x + 11, y - 39);
-          g.strokePath();
-        }
-
         if (state.shooting) {
           drawStar(g, x + facing * 27, y + 8, 2 * avgScale, 7 * avgScale, 4, Math.PI / 4, COLORS.gold, COLORS.gold, 1);
         }
@@ -3875,6 +3860,47 @@
         if (state.flash) {
           g.fillStyle(COLORS.white, 0.3);
           g.fillCircle(x, y, 30 * avgScale);
+        }
+      }
+
+      function drawBanditOverlayFx(g, state, time) {
+        if (!state.propeller) {
+          return;
+        }
+
+        const x = state.x;
+        const y = state.y + BANDIT_GAME_Y_OFFSET;
+        const avgScale = (state.scaleX + state.scaleY) * 0.5;
+        const rising = state.vy < -50;
+        const falling = state.vy > 120;
+        const hatOffsetY = rising ? -2 : falling ? 2 : 0;
+        const moveIntent = clamp((state.vx || 0) / PLAYER_SPEED, -1, 1);
+        const hatShift = moveIntent * 6 * 0.7;
+        const rotorAngle = time * 0.04;
+        const rotorDx = Math.cos(rotorAngle) * 14;
+        const rotorDy = Math.sin(rotorAngle) * 3;
+
+        g.fillStyle(COLORS.teal, 1);
+        g.fillEllipse(x + hatShift, y - 28 + hatOffsetY, 28 * state.scaleX, 10 * state.scaleY);
+        g.lineStyle(OUTLINE_W, COLORS.ink, 1);
+        g.strokeEllipse(x + hatShift, y - 28 + hatOffsetY, 28 * state.scaleX, 10 * state.scaleY);
+        g.beginPath();
+        g.moveTo(x + hatShift, y - 38 + hatOffsetY);
+        g.lineTo(x + hatShift, y - 26 + hatOffsetY);
+        g.strokePath();
+        g.beginPath();
+        g.moveTo(x - rotorDx + hatShift, y - 38 + hatOffsetY - rotorDy);
+        g.lineTo(x + rotorDx + hatShift, y - 38 + hatOffsetY + rotorDy);
+        g.strokePath();
+        g.lineStyle(2, COLORS.ink, 0.35);
+        g.beginPath();
+        g.moveTo(x - 10 + hatShift, y - 38 + hatOffsetY);
+        g.lineTo(x + 10 + hatShift, y - 38 + hatOffsetY);
+        g.strokePath();
+
+        if (state.flash) {
+          g.fillStyle(COLORS.white, 0.16);
+          g.fillEllipse(x + hatShift, y - 28 + hatOffsetY, 30 * avgScale, 12 * avgScale);
         }
       }
 
