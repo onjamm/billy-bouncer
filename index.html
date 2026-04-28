@@ -494,6 +494,10 @@
       }
 
       function getBanditDirectionForState(state) {
+        // Jetpack execution is profile-only (no neutral/front-facing).
+        if (state && state.jetpack) {
+          return (state.dir || 1) < 0 ? "west" : "east";
+        }
         const moveIntent = clamp((state.vx || 0) / PLAYER_SPEED, -1, 1);
         if (Math.abs(moveIntent) < 0.08) {
           return "south";
@@ -4435,8 +4439,9 @@
               const renderScale = BANDIT_GAME_SCALE * avgScale;
               // Anchor to the rendered sprite bounds so it stays correct if we tweak art/scale.
               const sb = spriteBounds;
-              const packX = sb ? sb.centerX - facing * sb.width * 0.28 : playerDrawState.x - facing * 24 * renderScale;
-              const packY = sb ? sb.top + sb.height * 0.54 : playerDrawState.y + BANDIT_GAME_Y_OFFSET - 18 * renderScale;
+              const packXFactor = facing < 0 ? 0.29 : 0.27; // slight asymmetry reads more "strapped on"
+              const packX = sb ? sb.centerX - facing * sb.width * packXFactor : playerDrawState.x - facing * 24 * renderScale;
+              const packY = sb ? sb.top + sb.height * 0.55 : playerDrawState.y + BANDIT_GAME_Y_OFFSET - 18 * renderScale;
               const packScale = renderScale * 0.62;
               const frame = Math.floor(time / 70) % 4;
               this.jetpackSprite
