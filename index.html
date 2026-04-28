@@ -4439,9 +4439,12 @@
               const renderScale = BANDIT_GAME_SCALE * avgScale;
               // Anchor to the rendered sprite bounds so it stays correct if we tweak art/scale.
               const sb = spriteBounds;
-              const packXFactor = facing < 0 ? 0.29 : 0.27; // slight asymmetry reads more "strapped on"
-              const packX = sb ? sb.centerX - facing * sb.width * packXFactor : playerDrawState.x - facing * 24 * renderScale;
-              const packY = sb ? sb.top + sb.height * 0.55 : playerDrawState.y + BANDIT_GAME_Y_OFFSET - 18 * renderScale;
+              // Use edge + inset rather than center-based scaling to avoid "floating in space".
+              const inset = 0.32; // % into the sprite from the back edge
+              const packX = sb
+                ? (facing > 0 ? sb.left + sb.width * inset : sb.right - sb.width * inset)
+                : playerDrawState.x - facing * 18 * renderScale;
+              const packY = sb ? sb.top + sb.height * 0.46 : playerDrawState.y + BANDIT_GAME_Y_OFFSET - 24 * renderScale;
               const packScale = renderScale * 0.62;
               const frame = Math.floor(time / 70) % 4;
               this.jetpackSprite
