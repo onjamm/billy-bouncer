@@ -3769,8 +3769,8 @@
           this.pickups.length = write;
         }
 
-        activatePoofText(x, y) {
-          const poof = this.add.text(x, y, "POOF", {
+        activatePoofText(x, y, text = "POOF") {
+          const poof = this.add.text(x, y, text, {
             fontFamily: "Georgia, serif",
             fontSize: "20px",
             fontStyle: "bold",
@@ -4351,7 +4351,7 @@
         playPlayerDeathPoof(x, y) {
           this.spawnBurst(x, y, COLORS.ink, 7);
           this.spawnDust(x, y + 10);
-          this.activatePoofText(x, y - 14);
+          this.activatePoofText(x, y - 14, "BUSTED");
           if (this.playerSprite) {
             this.tweens.add({
               targets: this.playerSprite,
