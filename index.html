@@ -3239,6 +3239,9 @@
 
           const gunX = this.player.x + 14 * this.playerState.dir;
           const gunY = this.player.y + 4;
+          if (IS_MOBILE && targetY >= gunY) {
+            targetY = gunY - (targetY - gunY);
+          }
           const dx = targetX - gunX;
           const dy = targetY - gunY;
           const mag = Math.max(1, Math.hypot(dx, dy));
