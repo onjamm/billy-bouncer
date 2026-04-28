@@ -111,8 +111,8 @@
       const PICKUP_BOB_SPEED = 0.005;
       const MENU_PROMPT_SPEED = 0.004;
       const MENU_START_BTN_Y = 620;
-      const MENU_START_BTN_W = 320;
-      const MENU_START_BTN_H = 54;
+      const MENU_START_BTN_PAD_X = 18;
+      const MENU_START_BTN_PAD_Y = 14;
       const THEME_BLEND = 200;
       const BEST_SCORE_KEY = "billy_bouncer_best";
       const LEADERBOARD_HANDLE_KEY = "billy_bouncer_handle";
@@ -1366,7 +1366,10 @@
           if (this.menuRequiresExplicitTilt) {
             this.domMenuStartBtn.style.display = "none";
           } else {
-            place(this.domMenuStartBtn, { x: GAME_W / 2, y: MENU_START_BTN_Y, w: MENU_START_BTN_W, h: MENU_START_BTN_H });
+            const promptBounds = this.prompt && this.prompt.getBounds ? this.prompt.getBounds() : null;
+            const w = promptBounds ? promptBounds.width + MENU_START_BTN_PAD_X * 2 : 320;
+            const h = promptBounds ? promptBounds.height + MENU_START_BTN_PAD_Y * 2 : 54;
+            place(this.domMenuStartBtn, { x: GAME_W / 2, y: MENU_START_BTN_Y, w, h });
           }
           place(this.domMenuBoardBtn, this.boardButtonBounds);
 
