@@ -1413,9 +1413,13 @@
           // Input
           this.cursors = this.input.keyboard.createCursorKeys();
           this.keys = this.input.keyboard.addKeys("A,D,SPACE,ENTER");
+          this.lastTouchShotAt = 0;
           this.onPointerDown = (pointer) => {
             if (this.gameOverShown) {
               this.handleOverlayPointer(pointer);
+              return;
+            }
+            if (IS_MOBILE && performance.now() - this.lastTouchShotAt < 450) {
               return;
             }
             void this.ensureMotionPermission();
@@ -1431,6 +1435,30 @@
             }
           };
           this.input.on("pointerup", this.onPointerUp);
+          if (IS_MOBILE && this.game.canvas) {
+            this.onCanvasTouchStart = (event) => {
+              if (this.gameOverShown) {
+                return;
+              }
+              const touch = event.changedTouches && event.changedTouches[0];
+              if (!touch) {
+                return;
+              }
+              if (event.cancelable) {
+                event.preventDefault();
+              }
+              void this.ensureMotionPermission();
+              const rect = this.game.canvas.getBoundingClientRect();
+              const localX = ((touch.clientX - rect.left) / rect.width) * GAME_W;
+              const localY = ((touch.clientY - rect.top) / rect.height) * GAME_H;
+              const aimPoint = this.cameras.main
+                ? this.cameras.main.getWorldPoint(localX, localY)
+                : { x: localX, y: localY };
+              this.lastTouchShotAt = performance.now();
+              this.tryShoot(aimPoint.x, aimPoint.y);
+            };
+            this.game.canvas.addEventListener("touchstart", this.onCanvasTouchStart, { passive: false });
+          }
           this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
           this.setupMotionControls();
 
@@ -3545,6 +3573,9 @@
           }
           if (this.onPointerUp) {
             this.input.off("pointerup", this.onPointerUp);
+          }
+          if (this.onCanvasTouchStart && this.game && this.game.canvas) {
+            this.game.canvas.removeEventListener("touchstart", this.onCanvasTouchStart);
           }
           if (this.domRideBtn) { this.domRideBtn.remove(); this.domRideBtn = null; }
           if (this.domSaloonBtn) { this.domSaloonBtn.remove(); this.domSaloonBtn = null; }
