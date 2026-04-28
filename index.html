@@ -2670,8 +2670,21 @@
             if (event.key === "Enter") {
               event.preventDefault();
               void submit();
+              return;
+            }
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              dismiss();
             }
           });
+          root.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              dismiss();
+            }
+          }, true);
           button.addEventListener("click", () => {
             void submit();
           });
@@ -2722,6 +2735,10 @@
           this.pendingLeaderboardScore = 0;
           this.setLeaderboardSubmitVisible(false);
           this.hideLeaderboardNamePrompt();
+          if (this.gameOverShown && this.domRideBtn) {
+            // Restore a sensible keyboard focus target after closing the modal.
+            this.domRideBtn.focus();
+          }
           if (this.gameOverShown && this.overlay && !this.overlay.visible) {
             this.revealGameOverOverlay();
           }
