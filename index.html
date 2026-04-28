@@ -4166,6 +4166,8 @@
         const y = state.y + BANDIT_GAME_Y_OFFSET;
         const avgScale = (state.scaleX + state.scaleY) * 0.5;
         const renderScale = BANDIT_GAME_SCALE * avgScale;
+        // Character got larger; keep hat anchored but reduce hat size so it stays proportional.
+        const hatScale = renderScale * 0.35;
         // Anchor off the actual rendered sprite so this doesn't drift when we tweak scale/assets.
         const topY = spriteBounds ? spriteBounds.top : y - BANDIT_SPRITE_ORIGIN_Y * BANDIT_FRAME_H * renderScale;
         const rising = state.vy < -50;
@@ -4174,18 +4176,18 @@
         const moveIntent = clamp((state.vx || 0) / PLAYER_SPEED, -1, 1);
         const hatShift = moveIntent * 6 * 0.7;
         const rotorAngle = time * 0.04;
-        const rotorDx = Math.cos(rotorAngle) * 14 * renderScale;
-        const rotorDy = Math.sin(rotorAngle) * 3 * renderScale;
+        const rotorDx = Math.cos(rotorAngle) * 14 * hatScale;
+        const rotorDy = Math.sin(rotorAngle) * 3 * hatScale;
 
         // Place brim a little below the sprite top so it sits on the hat/head, not above it.
         const brimY = topY + 18 * renderScale + hatOffsetY;
-        const rotorY = brimY - 10 * renderScale;
-        const stemBottomY = brimY + 2 * renderScale;
+        const rotorY = brimY - 10 * hatScale;
+        const stemBottomY = brimY + 2 * hatScale;
 
         g.fillStyle(COLORS.teal, 1);
-        g.fillEllipse(x + hatShift, brimY, 28 * renderScale, 10 * renderScale);
+        g.fillEllipse(x + hatShift, brimY, 28 * hatScale, 10 * hatScale);
         g.lineStyle(OUTLINE_W, COLORS.ink, 1);
-        g.strokeEllipse(x + hatShift, brimY, 28 * renderScale, 10 * renderScale);
+        g.strokeEllipse(x + hatShift, brimY, 28 * hatScale, 10 * hatScale);
         g.beginPath();
         g.moveTo(x + hatShift, rotorY);
         g.lineTo(x + hatShift, stemBottomY);
@@ -4196,13 +4198,13 @@
         g.strokePath();
         g.lineStyle(2, COLORS.ink, 0.35);
         g.beginPath();
-        g.moveTo(x - 10 * renderScale + hatShift, rotorY);
-        g.lineTo(x + 10 * renderScale + hatShift, rotorY);
+        g.moveTo(x - 10 * hatScale + hatShift, rotorY);
+        g.lineTo(x + 10 * hatScale + hatShift, rotorY);
         g.strokePath();
 
         if (state.flash) {
           g.fillStyle(COLORS.white, 0.16);
-          g.fillEllipse(x + hatShift, brimY, 30 * renderScale, 12 * renderScale);
+          g.fillEllipse(x + hatShift, brimY, 30 * hatScale, 12 * hatScale);
         }
       }
 
