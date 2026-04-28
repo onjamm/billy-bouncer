@@ -2323,8 +2323,8 @@
             }
             const frame = Math.floor(time / 80) % 4;
             pickup.sprite.setFrame(frame);
-            pickup.sprite.setScale(1.9);
-            pickup.sprite.setPosition(pickup.x, pickup.y - 6);
+            pickup.sprite.setScale(1.7);
+            pickup.sprite.setPosition(pickup.x, pickup.y - 10);
             pickup.sprite.setVisible(true);
             return;
           }
@@ -2831,8 +2831,8 @@
               id: this.idCounter++,
               type: "jetpack",
               x: startPlatform.x + 28,
-              y: startPlatform.y - 66,
-              baseY: startPlatform.y - 66,
+              y: startPlatform.y - 72,
+              baseY: startPlatform.y - 72,
               bobPhase: Math.random() * Math.PI * 2,
               radius: PICKUP_RADIUS
             });
