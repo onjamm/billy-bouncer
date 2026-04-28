@@ -180,7 +180,7 @@
       const PLATFORM_SPRING_VELOCITY = -1300;
       const PICKUP_SPRING_VELOCITY = -1600;
       const ROCKET_VELOCITY = -2200;
-      const JETPACK_VELOCITY = -320;
+      const JETPACK_VELOCITY = -980;
       const PROPELLER_LIFT_VELOCITY = -375;
       const BOOTS_VELOCITY = -1360;
       const BOOTS_BOUNCES = 6;
@@ -2323,7 +2323,8 @@
             }
             const frame = Math.floor(time / 80) % 4;
             pickup.sprite.setFrame(frame);
-            pickup.sprite.setPosition(pickup.x, pickup.y);
+            pickup.sprite.setScale(1.9);
+            pickup.sprite.setPosition(pickup.x, pickup.y - 6);
             pickup.sprite.setVisible(true);
             return;
           }
@@ -2830,8 +2831,8 @@
               id: this.idCounter++,
               type: "jetpack",
               x: startPlatform.x + 28,
-              y: startPlatform.y - 54,
-              baseY: startPlatform.y - 54,
+              y: startPlatform.y - 66,
+              baseY: startPlatform.y - 66,
               bobPhase: Math.random() * Math.PI * 2,
               radius: PICKUP_RADIUS
             });
@@ -4440,7 +4441,7 @@
               // Anchor to the rendered sprite bounds so it stays correct if we tweak art/scale.
               const sb = spriteBounds;
               // Use edge + inset rather than center-based scaling to avoid "floating in space".
-              const inset = 0.30; // % into the sprite from the back edge
+              const inset = 0.3073; // % into the sprite from the back edge (~3.5px closer at typical sprite widths)
               const packX = sb
                 ? (facing > 0 ? sb.left + sb.width * inset : sb.right - sb.width * inset)
                 : playerDrawState.x - facing * 18 * renderScale;
