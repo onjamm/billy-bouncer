@@ -209,6 +209,9 @@
       const PICKUP_RADIUS = 18;
       const COIN_BOB_SPEED = 0.008;
       const PICKUP_BOB_SPEED = 0.005;
+      // Keep pickups from visually stacking on top of each other (or spawning in impossible clusters).
+      const PICKUP_MIN_SEPARATION = 96;
+      const PICKUP_MIN_BLACKHOLE_SEPARATION = 170;
       const MENU_PROMPT_SPEED = 0.004;
       const MENU_START_BTN_Y = 620;
       const MENU_START_BTN_PAD_X = 18;
@@ -2827,15 +2830,19 @@
           this.platforms.push(startPlatform);
           if (DEV_START_JETPACK) {
             // Testing helper: always spawn a jetpack near the opening platform on localhost.
-            this.pickups.push({
-              id: this.idCounter++,
-              type: "jetpack",
-              x: startPlatform.x + 28,
-              y: startPlatform.y - 72,
-              baseY: startPlatform.y - 72,
-              bobPhase: Math.random() * Math.PI * 2,
-              radius: PICKUP_RADIUS
-            });
+            const x = wrapPlayableX(startPlatform.x + 28);
+            const y = startPlatform.y - 72;
+            if (this.canSpawnPickupCandidate(x, y)) {
+              this.pickups.push({
+                id: this.idCounter++,
+                type: "jetpack",
+                x,
+                y,
+                baseY: y,
+                bobPhase: Math.random() * Math.PI * 2,
+                radius: PICKUP_RADIUS
+              });
+            }
           }
           this.generatedPlatforms = 1;
           this.topSpawnY = START_PLATFORM_Y;
@@ -3011,6 +3018,32 @@
           this.maybeSpawnBlackHole(platform, altitude);
         }
 
+        canSpawnPickupCandidate(x, y) {
+          const minDistSq = PICKUP_MIN_SEPARATION * PICKUP_MIN_SEPARATION;
+          for (const other of this.pickups) {
+            // Use baseY so bobbing doesn't change spawn-clearance.
+            const otherY = other.baseY ?? other.y;
+            const dy = otherY - y;
+            if (Math.abs(dy) > PICKUP_MIN_SEPARATION) continue;
+            const dx = Math.abs(shortestWrappedDelta(other.x, x));
+            if (dx * dx + dy * dy < minDistSq) {
+              return false;
+            }
+          }
+
+          const minHoleDistSq = PICKUP_MIN_BLACKHOLE_SEPARATION * PICKUP_MIN_BLACKHOLE_SEPARATION;
+          for (const hole of this.blackHoles) {
+            const dy = hole.y - y;
+            if (Math.abs(dy) > PICKUP_MIN_BLACKHOLE_SEPARATION) continue;
+            const dx = Math.abs(shortestWrappedDelta(hole.x, x));
+            if (dx * dx + dy * dy < minHoleDistSq) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+
         createPlatform(x, y, type, width, safe) {
           const platform = {
             id: this.idCounter++,
@@ -3059,12 +3092,18 @@
               }
             : POWERUP_WEIGHTS;
           const type = chooseWeighted(powerupWeights);
+          const x = wrapPlayableX(platform.x + Phaser.Math.Between(-28, 28));
+          const yOffset = Phaser.Math.Between(36, 52);
+          const y = platform.y - yOffset;
+          if (!this.canSpawnPickupCandidate(x, y)) {
+            return;
+          }
           this.pickups.push({
             id: this.idCounter++,
             type,
-            x: platform.x + Phaser.Math.Between(-28, 28),
-            y: platform.y - Phaser.Math.Between(36, 52),
-            baseY: platform.y - Phaser.Math.Between(36, 52),
+            x,
+            y,
+            baseY: y,
             bobPhase: Math.random() * Math.PI * 2,
             radius: PICKUP_RADIUS
           });
@@ -3153,6 +3192,17 @@
           const y = platform.y - Phaser.Math.Between(86, 138);
           if (this.blackHoles.some((hole) => distance(hole.x, hole.y, x, y) < 240)) {
             return;
+          }
+          // Avoid spawning hazards right on top of pickups.
+          const minHoleDistSq = PICKUP_MIN_BLACKHOLE_SEPARATION * PICKUP_MIN_BLACKHOLE_SEPARATION;
+          for (const pickup of this.pickups) {
+            const pickupY = pickup.baseY ?? pickup.y;
+            const dy = pickupY - y;
+            if (Math.abs(dy) > PICKUP_MIN_BLACKHOLE_SEPARATION) continue;
+            const dx = Math.abs(shortestWrappedDelta(pickup.x, x));
+            if (dx * dx + dy * dy < minHoleDistSq) {
+              return;
+            }
           }
           this.blackHoles.push({
             id: this.idCounter++,
