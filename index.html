@@ -440,6 +440,12 @@
       const BANDIT_MENU_FOOT_PAD = 2;
       const BANDIT_BASE_SCALE = 2.2;
 
+      // Pixel-art fire jetpack (4-frame horizontal spritesheet, 32x32 each frame)
+      const JETPACK_SHEET_KEY = "jetpack-fire";
+      const JETPACK_SHEET_URL = "assets/pickups/jetpack-fire.png";
+      const JETPACK_FRAME_W = 32;
+      const JETPACK_FRAME_H = 32;
+
       // ============================================================
       // Utility helpers
       // ============================================================
@@ -465,6 +471,13 @@
             });
           }
         }
+        // Misc sprite assets
+        if (!scene.textures.exists(JETPACK_SHEET_KEY)) {
+          scene.load.spritesheet(JETPACK_SHEET_KEY, JETPACK_SHEET_URL, {
+            frameWidth: JETPACK_FRAME_W,
+            frameHeight: JETPACK_FRAME_H
+          });
+        }
       }
 
       function applyBanditTextureFilter(scene) {
@@ -473,6 +486,10 @@
           if (texture && texture.setFilter) {
             texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
           }
+        }
+        const jetpack = scene.textures.get(JETPACK_SHEET_KEY);
+        if (jetpack && jetpack.setFilter) {
+          jetpack.setFilter(Phaser.Textures.FilterMode.NEAREST);
         }
       }
 
@@ -1979,6 +1996,12 @@
             .setOrigin(0.5, BANDIT_SPRITE_ORIGIN_Y)
             .setScale(BANDIT_GAME_SCALE);
 
+          // Jetpack attachment sprite (PixelLab). Side-view only; flame anim plays while active.
+          this.jetpackSprite = this.add.sprite(GAME_W / 2, START_Y, JETPACK_SHEET_KEY, 0)
+            .setDepth(15)
+            .setOrigin(0.5, 0.5)
+            .setVisible(false);
+
           // Invisible physics host for the player
           this.player = this.add.rectangle(GAME_W / 2, START_Y, PLAYER_BODY_W, PLAYER_BODY_H, 0xffffff, 0);
           this.physics.add.existing(this.player);
@@ -2224,6 +2247,10 @@
         }
 
         ensurePickupTexture(type) {
+          // Jetpack uses a real spritesheet asset (PixelLab) instead of procedural drawing.
+          if (type === "jetpack") {
+            return JETPACK_SHEET_KEY;
+          }
           const key = `pickup-${type}`;
           if (this.staticTextureKeys.has(key) || this.textures.exists(key)) {
             this.staticTextureKeys.add(key);
@@ -4292,6 +4319,7 @@
               this.uiLayer,
               this.player,
               this.playerSprite,
+              this.jetpackSprite,
             this.textureBuilder
           ].forEach((obj) => {
             if (obj && obj.destroy) {
@@ -4383,6 +4411,29 @@
             rocket: this.time.now < this.playerState.rocketUntil
           };
           syncBanditSprite(this.playerSprite, playerDrawState, time, BANDIT_GAME_SCALE, BANDIT_GAME_Y_OFFSET);
+          // Jetpack attachment: snap to Billy's back at a believable height.
+          if (this.jetpackSprite) {
+            if (playerDrawState.jetpack) {
+              const facing = playerDrawState.dir < 0 ? -1 : 1;
+              const avgScale = (playerDrawState.scaleX + playerDrawState.scaleY) * 0.5;
+              const renderScale = BANDIT_GAME_SCALE * avgScale;
+              // Anchor relative to Billy's sprite origin and scale (tuned visually).
+              // Tuned so the pack sits on the shoulder blades, not on the belt/hips.
+              const packX = playerDrawState.x - facing * 24 * renderScale;
+              const packY = playerDrawState.y + BANDIT_GAME_Y_OFFSET - 28 * renderScale;
+              const packScale = renderScale * 0.62;
+              const frame = Math.floor(time / 70) % 4;
+              this.jetpackSprite
+                .setVisible(true)
+                .setFlipX(facing > 0) // sprite art is profile; flip for left/right
+                .setFrame(frame)
+                .setPosition(packX, packY)
+                .setScale(packScale);
+            } else {
+              this.jetpackSprite.setVisible(false);
+            }
+          }
+
           drawBanditFx(this.worldLayer, playerDrawState, time);
           const spriteBounds = this.playerSprite && this.playerSprite.getBounds ? this.playerSprite.getBounds() : null;
           drawBanditOverlayFx(this.playerOverlayLayer, playerDrawState, time, spriteBounds);
@@ -4507,14 +4558,8 @@
           g.strokeEllipse(x, shellY, shellW - 6 * renderScale, shellH - 8 * renderScale);
         }
 
-        if (state.jetpack) {
-          const frame = Math.floor(time / 80) % 4;
-          // Mount on Billy's back; keep it subtle and side-view only (left/right).
-          const packScale = renderScale * 0.35;
-          const packX = x - facing * 15 * renderScale;
-          const packY = y + 5 * renderScale;
-          drawPixelJetpack(g, packX, packY, packScale, -facing, frame, true);
-        }
+        // Jetpack is now rendered as a real sprite attachment (see GameScene.renderAll),
+        // so keep drawBanditFx focused on non-sprite effects.
 
         if (state.rocket) {
           g.fillStyle(COLORS.gold, 0.78);
@@ -5024,73 +5069,16 @@
         g.strokePath();
       }
 
-      function drawPixelJetpack(g, x, y, scale, facing, flameFrame, withFlame) {
-        // Pixel-art jetpack: simple side-view pack with a tiny flame flicker.
-        // All dimensions below are in "pixel units" multiplied by (2 * scale) for crisp blocks.
-        const px = Math.max(1, Math.round(2 * scale));
-        const dir = facing < 0 ? -1 : 1;
-        const rect = (dx, dy, w, h) => {
-          const wPx = w * px;
-          const hPx = h * px;
-          const x0 = x + dx * px * dir;
-          const rx = dir < 0 ? x0 - wPx : x0;
-          const ry = y + dy * px;
-          g.fillRect(rx, ry, wPx, hPx);
-        };
-
-        // Body (old brass) with ink outline.
-        g.fillStyle(COLORS.oldBrass, 1);
-        rect(-3, -8, 7, 10); // main tank
-        rect(4, -6, 2, 7); // side pod
-        rect(-2, -9, 5, 1); // top lip
-        rect(-2, 2, 5, 1); // bottom lip
-
-        g.fillStyle(COLORS.ink, 1);
-        // Outline: top, bottom, back, front.
-        rect(-4, -9, 1, 12);
-        rect(-3, -9, 9, 1);
-        rect(-3, 3, 9, 1);
-        rect(6, -8, 1, 12);
-        rect(5, -6, 1, 8);
-
-        // Teal accent stripe.
-        g.fillStyle(COLORS.teal, 1);
-        rect(-1, -6, 1, 8);
-
-        // Nozzle.
-        g.fillStyle(COLORS.ink, 1);
-        rect(-1, 3, 4, 2);
-        g.fillStyle(COLORS.rust, 1);
-        rect(0, 4, 2, 1);
-
-        if (!withFlame) return;
-
-        const fx = 0;
-        const baseY = 5;
-        const f = flameFrame % 4;
-        // Flame palette: gold -> poncho -> rust.
-        const flame = [
-          { c: COLORS.gold, a: 1 },
-          { c: COLORS.poncho, a: 1 },
-          { c: COLORS.rust, a: 1 }
-        ];
-
-        // Three flicker variants; keep it subtle so it reads as "pixel sprite" not particle spam.
-        g.fillStyle(flame[0].c, flame[0].a);
-        rect(fx + 0, baseY + (f === 1 ? 1 : 0), 3, 1);
-        g.fillStyle(flame[1].c, flame[1].a);
-        rect(fx + 0, baseY + 1 + (f === 2 ? 1 : 0), 2, 1);
-        g.fillStyle(flame[2].c, flame[2].a);
-        rect(fx + 1, baseY + 2 + (f === 3 ? 1 : 0), 1, 1);
-      }
-
       function drawPickup(g, pickup) {
         if (pickup.type === "spring") {
           drawSpringShape(g, pickup.x, pickup.y + 1, 1);
         } else if (pickup.type === "jetpack") {
-          // Pickup sits as a readable side-view sprite.
-          // (This is used both for one-time texture generation and the fallback direct draw path.)
-          drawPixelJetpack(g, pickup.x, pickup.y + 1, 1, 1, 0, false);
+          // Jetpack pickup uses the PixelLab spritesheet; this path is only used when generating
+          // a procedural texture, so keep it as a simple fallback silhouette.
+          g.fillStyle(COLORS.oldBrass, 1);
+          g.fillRect(pickup.x - 10, pickup.y - 10, 20, 20);
+          g.lineStyle(3, COLORS.ink, 1);
+          g.strokeRect(pickup.x - 10, pickup.y - 10, 20, 20);
         } else if (pickup.type === "rocket") {
           g.fillStyle(COLORS.rust, 1);
           g.fillTriangle(pickup.x, pickup.y - 14, pickup.x - 12, pickup.y + 12, pickup.x + 12, pickup.y + 12);
