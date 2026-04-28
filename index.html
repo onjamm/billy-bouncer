@@ -218,9 +218,9 @@
       const LEADERBOARD_HANDLE_KEY = "billy_bouncer_handle";
       const LEADERBOARD_LAST_SUBMITTED_KEY = "billy_bouncer_last_submitted";
       const VOLUME_KEY = "billy_bouncer_volume";
-      const DEFAULT_VOLUME = 0.75; // matches the old perceived loudness (~0.22 master gain)
-      const VOLUME_MAX_GAIN = 0.36;
-      const VOLUME_CURVE = 1.7; // perceptual curve: more resolution at the quiet end
+      const DEFAULT_VOLUME = 0.82; // slightly louder by default
+      const VOLUME_MAX_GAIN = 0.5; // more headroom at 100%
+      const VOLUME_CURVE = 1.4; // still perceptual, but not as aggressive (less "too quiet")
       const OUTLINE_W = 4;
       const MENU_BOUNCE_HEIGHT = 78;
       const MENU_BOUNCE_PERIOD = 920;
