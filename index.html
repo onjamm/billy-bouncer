@@ -3981,7 +3981,8 @@
           };
           syncBanditSprite(this.playerSprite, playerDrawState, time, BANDIT_GAME_SCALE, BANDIT_GAME_Y_OFFSET);
           drawBanditFx(this.worldLayer, playerDrawState, time);
-          drawBanditOverlayFx(this.playerOverlayLayer, playerDrawState, time);
+          const spriteBounds = this.playerSprite && this.playerSprite.getBounds ? this.playerSprite.getBounds() : null;
+          drawBanditOverlayFx(this.playerOverlayLayer, playerDrawState, time, spriteBounds);
 
           this.drawHUDDecor(time);
         }
@@ -4129,7 +4130,7 @@
         }
       }
 
-      function drawBanditOverlayFx(g, state, time) {
+      function drawBanditOverlayFx(g, state, time, spriteBounds) {
         if (!state.propeller) {
           return;
         }
@@ -4138,19 +4139,21 @@
         const y = state.y + BANDIT_GAME_Y_OFFSET;
         const avgScale = (state.scaleX + state.scaleY) * 0.5;
         const renderScale = BANDIT_GAME_SCALE * avgScale;
-        // Keep the propeller hat aligned as Billy's visual scale changes.
-        const propellerPosScale = renderScale / BANDIT_BASE_SCALE;
+        // Anchor off the actual rendered sprite so this doesn't drift when we tweak scale/assets.
+        const topY = spriteBounds ? spriteBounds.top : y - BANDIT_SPRITE_ORIGIN_Y * BANDIT_FRAME_H * renderScale;
         const rising = state.vy < -50;
         const falling = state.vy > 120;
-        const hatOffsetY = (rising ? -2 : falling ? 2 : 0) * propellerPosScale;
+        const hatOffsetY = (rising ? -2 : falling ? 2 : 0) * renderScale;
         const moveIntent = clamp((state.vx || 0) / PLAYER_SPEED, -1, 1);
         const hatShift = moveIntent * 6 * 0.7;
         const rotorAngle = time * 0.04;
-        const rotorDx = Math.cos(rotorAngle) * 14 * propellerPosScale;
-        const rotorDy = Math.sin(rotorAngle) * 3 * propellerPosScale;
-        const brimY = y - 28 * propellerPosScale + hatOffsetY;
-        const rotorY = y - 38 * propellerPosScale + hatOffsetY;
-        const stemBottomY = y - 26 * propellerPosScale + hatOffsetY;
+        const rotorDx = Math.cos(rotorAngle) * 14 * renderScale;
+        const rotorDy = Math.sin(rotorAngle) * 3 * renderScale;
+
+        // Place brim a little below the sprite top so it sits on the hat/head, not above it.
+        const brimY = topY + 18 * renderScale + hatOffsetY;
+        const rotorY = brimY - 10 * renderScale;
+        const stemBottomY = brimY + 2 * renderScale;
 
         g.fillStyle(COLORS.teal, 1);
         g.fillEllipse(x + hatShift, brimY, 28 * renderScale, 10 * renderScale);
@@ -4166,8 +4169,8 @@
         g.strokePath();
         g.lineStyle(2, COLORS.ink, 0.35);
         g.beginPath();
-        g.moveTo(x - 10 * propellerPosScale + hatShift, rotorY);
-        g.lineTo(x + 10 * propellerPosScale + hatShift, rotorY);
+        g.moveTo(x - 10 * renderScale + hatShift, rotorY);
+        g.lineTo(x + 10 * renderScale + hatShift, rotorY);
         g.strokePath();
 
         if (state.flash) {
