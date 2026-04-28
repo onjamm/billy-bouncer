@@ -234,7 +234,6 @@
       const ROCKET_MS = 1500;
       const PROPELLER_MS = 3300;
       const FRAGILE_RESPAWN_MS = 3200;
-      const DEV_START_JETPACK = typeof window !== "undefined" && /^(localhost|127\\.0\\.0\\.1)$/i.test(window.location.hostname || "");
       const OPENING_PLATFORM_COUNT = 12;
       const OPENING_PLATFORM_PATTERN = ["normal", "movingH", "normal", "movingH", "normal", "movingH", "normal", "movingH", "normal", "movingH", "normal"];
       const OPENING_GAP_MIN = 92;
@@ -2828,22 +2827,6 @@
         seedWorld() {
           const startPlatform = this.createPlatform(GAME_W / 2, START_PLATFORM_Y, "normal", PLATFORM_W + 30, true);
           this.platforms.push(startPlatform);
-          if (DEV_START_JETPACK) {
-            // Testing helper: always spawn a jetpack near the opening platform on localhost.
-            const x = wrapPlayableX(startPlatform.x + 28);
-            const y = startPlatform.y - 72;
-            if (this.canSpawnPickupCandidate(x, y)) {
-              this.pickups.push({
-                id: this.idCounter++,
-                type: "jetpack",
-                x,
-                y,
-                baseY: y,
-                bobPhase: Math.random() * Math.PI * 2,
-                radius: PICKUP_RADIUS
-              });
-            }
-          }
           this.generatedPlatforms = 1;
           this.topSpawnY = START_PLATFORM_Y;
           this.lastSpawnPlatform = startPlatform;
