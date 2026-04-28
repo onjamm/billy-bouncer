@@ -72,6 +72,8 @@
       const PLAYER_BODY_H = 46;
       const PLAYER_DRAW_W = 36;
       const PLAYER_DRAW_H = 52;
+      const PLAYER_STOMP_W = 40;
+      const PLAYER_STOMP_BOTTOM_BONUS = 6;
       const PLAYER_SPEED = 340;
       const PLAYER_WRAP_MARGIN = 20;
       const JUMP_VELOCITY = -680;
@@ -87,6 +89,7 @@
       const MAX_PELLETS = 3;
       const LANDING_TOLERANCE = 18;
       const STOMP_TOLERANCE = 14;
+      const STOMP_MIN_OVERLAP = 10;
       const BLACK_HOLE_PULL_RADIUS = 120;
       const BLACK_HOLE_KILL_RADIUS = 20;
       const BLACK_HOLE_FORCE = 820;
@@ -301,16 +304,22 @@
         { key: "silver", label: "SILVER", threshold: 50000, color: 0x909090 },
         { key: "gold", label: "GOLD", threshold: 100000, color: 0xC9960A }
       ];
-      const BANDIT_TEXTURE_KEYS = {
-        neutral: "bandit-sprite-neutral",
-        left: "bandit-sprite-left",
-        right: "bandit-sprite-right"
-      };
-      const BANDIT_TEXTURE_PATHS = {
-        neutral: "assets/characters/bandit/south.png",
-        left: "assets/characters/bandit/west.png",
-        right: "assets/characters/bandit/east.png"
-      };
+      // Billy sprite (PixelLab export, packed into a few small spritesheets)
+      const BANDIT_FRAME_W = 76;
+      const BANDIT_FRAME_H = 76;
+      const BANDIT_SHEETS = [
+        // idle
+        { key: "bandit-idle-south", url: "assets/characters/bandit-pro/idle-south.png", frames: 4 },
+        { key: "bandit-idle-east", url: "assets/characters/bandit-pro/idle-east.png", frames: 4 },
+        { key: "bandit-idle-west", url: "assets/characters/bandit-pro/idle-west.png", frames: 4 },
+        // run
+        { key: "bandit-run-south", url: "assets/characters/bandit-pro/run-south.png", frames: 8 },
+        { key: "bandit-run-east", url: "assets/characters/bandit-pro/run-east.png", frames: 8 },
+        { key: "bandit-run-west", url: "assets/characters/bandit-pro/run-west.png", frames: 8 },
+        // jump + shoot currently only authored for south (front-facing)
+        { key: "bandit-jump-south", url: "assets/characters/bandit-pro/jump-south.png", frames: 9 },
+        { key: "bandit-shoot-south", url: "assets/characters/bandit-pro/shoot-south.png", frames: 7 }
+      ];
       const BANDIT_SPRITE_ORIGIN_Y = 0.62;
       const BANDIT_MENU_SCALE = 2.2;
       const BANDIT_GAME_SCALE = 2.2;
@@ -334,28 +343,81 @@
       }
 
       function preloadBanditTextures(scene) {
-        for (const [variant, textureKey] of Object.entries(BANDIT_TEXTURE_KEYS)) {
-          if (!scene.textures.exists(textureKey)) {
-            scene.load.image(textureKey, BANDIT_TEXTURE_PATHS[variant]);
+        for (const sheet of BANDIT_SHEETS) {
+          if (!scene.textures.exists(sheet.key)) {
+            scene.load.spritesheet(sheet.key, sheet.url, {
+              frameWidth: BANDIT_FRAME_W,
+              frameHeight: BANDIT_FRAME_H
+            });
           }
         }
       }
 
       function applyBanditTextureFilter(scene) {
-        for (const textureKey of Object.values(BANDIT_TEXTURE_KEYS)) {
-          const texture = scene.textures.get(textureKey);
+        for (const sheet of BANDIT_SHEETS) {
+          const texture = scene.textures.get(sheet.key);
           if (texture && texture.setFilter) {
             texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
           }
         }
       }
 
-      function getBanditTextureKeyForState(state) {
+      function getBanditDirectionForState(state) {
         const moveIntent = clamp((state.vx || 0) / PLAYER_SPEED, -1, 1);
         if (Math.abs(moveIntent) < 0.08) {
-          return BANDIT_TEXTURE_KEYS.neutral;
+          return "south";
         }
-        return moveIntent < 0 ? BANDIT_TEXTURE_KEYS.left : BANDIT_TEXTURE_KEYS.right;
+        return moveIntent < 0 ? "west" : "east";
+      }
+
+      function ensureBanditAnimations(scene) {
+        if (!scene || !scene.anims || !scene.anims.create) {
+          return;
+        }
+        const defs = [
+          { key: "bandit-idle-south", sheet: "bandit-idle-south", end: 3, fps: 6, repeat: -1 },
+          { key: "bandit-idle-east", sheet: "bandit-idle-east", end: 3, fps: 6, repeat: -1 },
+          { key: "bandit-idle-west", sheet: "bandit-idle-west", end: 3, fps: 6, repeat: -1 },
+          { key: "bandit-run-south", sheet: "bandit-run-south", end: 7, fps: 12, repeat: -1 },
+          { key: "bandit-run-east", sheet: "bandit-run-east", end: 7, fps: 12, repeat: -1 },
+          { key: "bandit-run-west", sheet: "bandit-run-west", end: 7, fps: 12, repeat: -1 },
+          { key: "bandit-jump-south", sheet: "bandit-jump-south", end: 8, fps: 14, repeat: 0 },
+          { key: "bandit-shoot-south", sheet: "bandit-shoot-south", end: 6, fps: 18, repeat: 0 }
+        ];
+
+        for (const def of defs) {
+          if (scene.anims.exists && scene.anims.exists(def.key)) {
+            continue;
+          }
+          scene.anims.create({
+            key: def.key,
+            frames: scene.anims.generateFrameNumbers(def.sheet, { start: 0, end: def.end }),
+            frameRate: def.fps,
+            repeat: def.repeat
+          });
+        }
+      }
+
+      function getBanditAnimKeyForState(state) {
+        const dir = getBanditDirectionForState(state);
+        const moving = Math.abs(state.vx || 0) > PLAYER_SPEED * 0.15;
+        const ascending = (state.vy || 0) < -260;
+        const shooting = !!state.shooting;
+
+        // Shoot is a snappy one-shot; only front-facing exists right now.
+        if (shooting && dir === "south") {
+          return "bandit-shoot-south";
+        }
+
+        // Jump read is best when front-facing; otherwise keep directional run/idle.
+        if (ascending && dir === "south") {
+          return "bandit-jump-south";
+        }
+
+        if (moving) {
+          return `bandit-run-${dir}`;
+        }
+        return `bandit-idle-${dir}`;
       }
 
       function syncBanditSprite(sprite, state, time, baseScale, yOffset = 0) {
@@ -363,7 +425,13 @@
           return;
         }
 
-        sprite.setTexture(getBanditTextureKeyForState(state));
+        const animKey = getBanditAnimKeyForState(state);
+        if (sprite.anims && sprite.anims.play && sprite.anims.currentAnim?.key !== animKey) {
+          sprite.play(animKey, true);
+        } else if (sprite.setTexture) {
+          // Fallback for any non-sprite GameObject (shouldn't happen anymore).
+          sprite.setTexture(animKey);
+        }
         sprite.setPosition(state.x, state.y + yOffset);
         sprite.setScale(baseScale * state.scaleX, baseScale * state.scaleY);
         sprite.setAlpha(state.flash && Math.floor(time / 50) % 2 === 0 ? 0.5 : 1);
@@ -1049,7 +1117,8 @@
           this.bg = this.add.graphics().setScrollFactor(0);
           this.preview = this.add.graphics();
           applyBanditTextureFilter(this);
-          this.previewBandit = this.add.image(GAME_W / 2, 0, BANDIT_TEXTURE_KEYS.neutral)
+          ensureBanditAnimations(this);
+          this.previewBandit = this.add.sprite(GAME_W / 2, 0, "bandit-idle-south", 0)
             .setDepth(16)
             .setOrigin(0.5, BANDIT_SPRITE_ORIGIN_Y)
             .setScale(BANDIT_MENU_SCALE);
@@ -1401,7 +1470,8 @@
           this.playerOverlayLayer = this.add.graphics().setDepth(16);
           this.uiLayer = this.add.graphics().setScrollFactor(0).setDepth(100);
           applyBanditTextureFilter(this);
-          this.playerSprite = this.add.image(GAME_W / 2, START_Y, BANDIT_TEXTURE_KEYS.neutral)
+          ensureBanditAnimations(this);
+          this.playerSprite = this.add.sprite(GAME_W / 2, START_Y, "bandit-idle-south", 0)
             .setDepth(14)
             .setOrigin(0.5, BANDIT_SPRITE_ORIGIN_Y)
             .setScale(BANDIT_GAME_SCALE);
@@ -3103,13 +3173,30 @@
 
           const prevBottom = (this.prevPlayerY ?? this.player.y) + PLAYER_BODY_H / 2;
           const playerBottom = this.player.y + PLAYER_BODY_H / 2;
-          const playerLeft = this.player.x - PLAYER_BODY_W / 2;
-          const playerRight = this.player.x + PLAYER_BODY_W / 2;
           const playerRect = { x: this.player.x, y: this.player.y, w: PLAYER_BODY_W, h: PLAYER_BODY_H };
+          const prevStompBottom = prevBottom + PLAYER_STOMP_BOTTOM_BONUS;
+          const stompBottom = playerBottom + PLAYER_STOMP_BOTTOM_BONUS;
+          const stompLeft = this.player.x - PLAYER_STOMP_W / 2;
+          const stompRight = this.player.x + PLAYER_STOMP_W / 2;
 
           for (const enemy of this.enemies) {
             if (enemy.dead || enemy.stompPending) {
               continue;
+            }
+
+            const enemyTop = enemy.y - enemy.h / 2;
+            const enemyLeft = enemy.x - enemy.w / 2;
+            const enemyRight = enemy.x + enemy.w / 2;
+            const topOverlap = Math.min(stompRight, enemyRight) - Math.max(stompLeft, enemyLeft);
+            const touchingEnemyTop =
+              topOverlap >= STOMP_MIN_OVERLAP &&
+              prevStompBottom <= enemyTop + STOMP_TOLERANCE &&
+              stompBottom >= enemyTop - 2;
+            const fallingOnTop = this.player.body.velocity.y > 0 && touchingEnemyTop;
+
+            if (fallingOnTop) {
+              this.stompEnemy(enemy, enemyTop);
+              return;
             }
 
             const hit = rectsOverlap(playerRect, enemy);
@@ -3120,21 +3207,6 @@
             if (propellerActive && enemy.y < this.player.y + 8) {
               this.damageEnemy(enemy, enemy.hp);
               continue;
-            }
-
-            const enemyTop = enemy.y - enemy.h / 2;
-            const enemyLeft = enemy.x - enemy.w / 2;
-            const enemyRight = enemy.x + enemy.w / 2;
-            const topOverlap = Math.min(playerRight, enemyRight) - Math.max(playerLeft, enemyLeft);
-            const touchingEnemyTop =
-              topOverlap > 0 &&
-              prevBottom <= enemyTop + STOMP_TOLERANCE &&
-              playerBottom >= enemyTop - 2;
-            const fallingOnTop = this.player.body.velocity.y > 0 && touchingEnemyTop;
-
-            if (fallingOnTop) {
-              this.stompEnemy(enemy, enemyTop);
-              return;
             }
 
             if (this.playerState.shield) {
