@@ -193,6 +193,7 @@
       const BLACK_HOLE_PULL_RADIUS = 120;
       const BLACK_HOLE_KILL_RADIUS = 20;
       const BLACK_HOLE_FORCE = 820;
+      const BLACK_HOLE_TELEPORT_COOLDOWN_MS = 1100;
       const Ufo_BEAM_WIDTH = 60;
       const Ufo_BEAM_HEIGHT = 80;
       const Ufo_ABDUCT_MS = 1500;
@@ -2105,6 +2106,8 @@
           this.effects = [];
           this.poofTexts = [];
           this.idCounter = 1;
+          this.blackHoleTeleportUntil = 0;
+          this.deathAnimUntil = 0;
 
           this.createHUD();
           this.createGameOverOverlay();
@@ -3027,6 +3030,30 @@
           return true;
         }
 
+        teleportPlayerFromBlackHole(hole) {
+          const now = this.time.now;
+          if (this.gameOverShown || now < (this.blackHoleTeleportUntil || 0)) {
+            return;
+          }
+          this.blackHoleTeleportUntil = now + BLACK_HOLE_TELEPORT_COOLDOWN_MS;
+
+          // Visual + audio punch.
+          this.cameras.main.shake(160, 0.01);
+          this.spawnBurst(hole.x, hole.y, COLORS.blackHole, 8);
+
+          const topY = this.cameras.main.scrollY;
+          const targetY = topY + Phaser.Math.Between(110, 220);
+          const targetX = Phaser.Math.Between(60, GAME_W - 60);
+          this.player.x = targetX;
+          this.player.y = targetY;
+          this.player.body.reset(targetX, targetY);
+          this.player.body.setVelocity(Phaser.Math.Between(-90, 90), Phaser.Math.Between(-260, -420));
+
+          // Give a brief invincibility window so you don't instantly chain into another hazard.
+          this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, now + 700);
+          this.playerState.flashUntil = now + 220;
+        }
+
         createPlatform(x, y, type, width, safe) {
           const platform = {
             id: this.idCounter++,
@@ -3910,7 +3937,7 @@
             }
 
             if (!this.consumeShield(enemy.x, enemy.y)) {
-              this.triggerGameOver();
+              this.triggerGameOver({ animate: true, delayMs: 900 });
               return;
             }
           }
@@ -3975,7 +4002,8 @@
                 continue;
               }
               if (!this.consumeShield(hole.x, hole.y)) {
-                this.triggerGameOver();
+                // Black holes don't kill anymore: they scramble you upward.
+                this.teleportPlayerFromBlackHole(hole);
               }
             }
           }
@@ -4309,16 +4337,27 @@
           this.showLeaderboardNamePrompt(score);
         }
 
-        triggerGameOver() {
-          if (this.gameOverShown) {
-            return;
+        playPlayerDeathPoof(x, y) {
+          this.spawnBurst(x, y, COLORS.ink, 7);
+          this.spawnDust(x, y + 10);
+          this.activatePoofText(x, y - 14);
+          if (this.playerSprite) {
+            this.tweens.add({
+              targets: this.playerSprite,
+              alpha: 0,
+              scaleX: this.playerSprite.scaleX * 0.92,
+              scaleY: this.playerSprite.scaleY * 0.92,
+              duration: 260,
+              ease: "Quad.easeOut"
+            });
           }
-          this.gameOverShown = true;
-          this.pendingLeaderboardScore = 0;
-          this.setLeaderboardSubmitVisible(false);
-          this.hideLeaderboardNamePrompt();
-          this.physics.world.pause();
-          this.player.body.setVelocity(0, 0);
+          if (this.jetpackSprite) {
+            this.jetpackSprite.setVisible(false);
+          }
+        }
+
+        finalizeGameOver() {
+          // Everything that used to happen in triggerGameOver() after the immediate stop.
           this.audio.stopAll();
           this.audio.gameOver();
           this.gameOverLine.setText(this.getRandomGameOverLine());
@@ -4334,6 +4373,31 @@
           }
           this.revealGameOverOverlay();
           void this.maybeSubmitLeaderboardScore(this.score);
+        }
+
+        triggerGameOver(options = null) {
+          if (this.gameOverShown) {
+            return;
+          }
+          this.gameOverShown = true;
+          this.pendingLeaderboardScore = 0;
+          this.setLeaderboardSubmitVisible(false);
+          this.hideLeaderboardNamePrompt();
+          this.physics.world.pause();
+          this.player.body.setVelocity(0, 0);
+
+          const animate = options && options.animate;
+          const delayMs = options && Number.isFinite(options.delayMs) ? options.delayMs : 900;
+          if (animate) {
+            const x = this.player.x;
+            const y = this.player.y;
+            this.deathAnimUntil = this.time.now + delayMs;
+            this.playPlayerDeathPoof(x, y);
+            this.time.delayedCall(delayMs, () => this.finalizeGameOver());
+            return;
+          }
+
+          this.finalizeGameOver();
         }
 
         shutdown() {
