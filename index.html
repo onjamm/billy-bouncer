@@ -824,6 +824,7 @@
           this.rumbleGain = null;
           this.unlocked = false;
           this.volume = DEFAULT_VOLUME;
+          this.lastNonZeroVolume = DEFAULT_VOLUME;
           try {
             const saved = Number(localStorage.getItem(VOLUME_KEY));
             if (Number.isFinite(saved)) {
@@ -831,6 +832,9 @@
             }
           } catch (error) {
             // localStorage can be unavailable in some embedded contexts; fall back to default.
+          }
+          if (this.volume > 0.001) {
+            this.lastNonZeroVolume = this.volume;
           }
         }
 
@@ -841,10 +845,21 @@
         setVolume(next) {
           const value = clamp(Number(next), 0, 1);
           this.volume = value;
+          if (value > 0.001) {
+            this.lastNonZeroVolume = value;
+          }
           try {
             localStorage.setItem(VOLUME_KEY, String(value));
           } catch (error) {}
           this.applyVolume();
+        }
+
+        toggleMute() {
+          if (this.getVolume() > 0.001) {
+            this.setVolume(0);
+            return;
+          }
+          this.setVolume(this.lastNonZeroVolume > 0.001 ? this.lastNonZeroVolume : DEFAULT_VOLUME);
         }
 
         applyVolume() {
@@ -1591,13 +1606,44 @@
               this.domMenuBoardBtn.focus();
             }
           };
-          const toggleVolume = (e) => {
-            if (e && e.preventDefault) e.preventDefault();
-            this.setVolumeOpen(!this.volumeOpen);
-            if (this.volumeOpen && this.domMenuVolumeRange) {
+          const applyVolumeToUI = (focusSlider) => {
+            if (this.domMenuVolumeRange) {
               this.domMenuVolumeRange.value = String(Math.round((this.audio ? this.audio.getVolume() : DEFAULT_VOLUME) * 100));
-              this.domMenuVolumeRange.focus();
+              if (focusSlider) {
+                this.domMenuVolumeRange.focus();
+              }
             }
+            if (this.updateMenuVolumeIcon) {
+              this.updateMenuVolumeIcon();
+            }
+          };
+          const toggleVolumePanel = () => {
+            this.setVolumeOpen(!this.volumeOpen);
+            if (this.volumeOpen) {
+              applyVolumeToUI(true);
+            }
+          };
+          const toggleMute = () => {
+            if (this.audio && this.audio.toggleMute) {
+              this.audio.toggleMute();
+            } else if (this.audio && this.audio.setVolume) {
+              const v = this.audio.getVolume ? this.audio.getVolume() : DEFAULT_VOLUME;
+              this.audio.setVolume(v > 0.001 ? 0 : DEFAULT_VOLUME);
+            }
+            applyVolumeToUI(false);
+          };
+          const handleVolumePress = (e) => {
+            if (e && e.preventDefault) e.preventDefault();
+            if (this.menuVolumeTapTimer) {
+              clearTimeout(this.menuVolumeTapTimer);
+              this.menuVolumeTapTimer = null;
+              toggleMute();
+              return;
+            }
+            this.menuVolumeTapTimer = setTimeout(() => {
+              this.menuVolumeTapTimer = null;
+              toggleVolumePanel();
+            }, 220);
           };
 
           this.domMenuStartBtn.addEventListener("click", start);
@@ -1606,8 +1652,8 @@
           this.domMenuBoardBtn.addEventListener("touchend", toggleBoard, { passive: false });
           this.domMenuBoardCloseBtn.addEventListener("click", closeBoard);
           this.domMenuBoardCloseBtn.addEventListener("touchend", closeBoard, { passive: false });
-          this.domMenuVolumeBtn.addEventListener("click", toggleVolume);
-          this.domMenuVolumeBtn.addEventListener("touchend", toggleVolume, { passive: false });
+          this.domMenuVolumeBtn.addEventListener("click", handleVolumePress);
+          this.domMenuVolumeBtn.addEventListener("touchend", handleVolumePress, { passive: false });
 
           // Keep buttons lined up with the canvas even after mobile viewport changes.
           this.positionMenuDOMButtons = () => this.positionMenuDOMButtonsImpl();
@@ -1728,6 +1774,10 @@
           if (this.domMenuVolumeBtn) { this.domMenuVolumeBtn.remove(); this.domMenuVolumeBtn = null; }
           if (this.domMenuVolumePanel) { this.domMenuVolumePanel.remove(); this.domMenuVolumePanel = null; }
           this.domMenuVolumeRange = null;
+          if (this.menuVolumeTapTimer) {
+            clearTimeout(this.menuVolumeTapTimer);
+            this.menuVolumeTapTimer = null;
+          }
           if (this.motionButton) {
             this.motionButton.removeEventListener("touchend", this.onMotionButtonPress);
             this.motionButton.removeEventListener("click", this.onMotionButtonPress);
