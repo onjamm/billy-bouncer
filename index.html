@@ -270,6 +270,8 @@
       const ENEMY_SAFE_LANE_WIDTH = 126;
       const ENEMY_BAND_SPACING = 138;
       const ENEMY_SAME_BAND_X_SPACING = 144;
+      // If we go too long without an enemy, force the next eligible platform to spawn one.
+      const ENEMY_PITY_ALTITUDE_GAP = 820;
       const PLATFORM_LANDING_STRIP = 42;
       const TILT_DEAD_ZONE = 2.5;
       const TILT_FULL_STEER = 28;
@@ -2108,6 +2110,7 @@
           this.idCounter = 1;
           this.blackHoleTeleportUntil = 0;
           this.deathAnimUntil = 0;
+          this.lastEnemySpawnAltitude = SAFE_ENEMY_START_ALTITUDE - 260;
 
           this.createHUD();
           this.createGameOverOverlay();
@@ -3121,7 +3124,14 @@
 
         maybeSpawnEnemy(platform, altitude) {
           // Enemy spawn rate scales with altitude; keep the early band calmer but avoid long "dead" vertical stretches.
-          if (platform.safe || altitude < SAFE_ENEMY_START_ALTITUDE || this.playerState.repellentUntil > this.time.now || Math.random() > map(altitude, 0, 7000, 0.12, 0.26)) {
+          if (platform.safe || altitude < SAFE_ENEMY_START_ALTITUDE || this.playerState.repellentUntil > this.time.now) {
+            return;
+          }
+
+          const drought = altitude - (this.lastEnemySpawnAltitude ?? -Infinity);
+          const pity = drought >= ENEMY_PITY_ALTITUDE_GAP;
+          const spawnChance = map(altitude, 0, 7000, 0.18, 0.34);
+          if (!pity && Math.random() > spawnChance) {
             return;
           }
 
@@ -3192,6 +3202,7 @@
           }
 
           this.enemies.push(enemy);
+          this.lastEnemySpawnAltitude = altitude;
         }
 
         maybeSpawnBlackHole(platform, altitude) {
