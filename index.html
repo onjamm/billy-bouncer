@@ -321,10 +321,13 @@
         { key: "bandit-shoot-south", url: "assets/characters/bandit-pro/shoot-south.png", frames: 7 }
       ];
       const BANDIT_SPRITE_ORIGIN_Y = 0.62;
-      const BANDIT_MENU_SCALE = 2.2;
-      const BANDIT_GAME_SCALE = 2.2;
+      // Slightly oversized on purpose for readability; collisions are driven by an invisible
+      // Arcade body, so this is purely visual.
+      const BANDIT_MENU_SCALE = 2.55;
+      const BANDIT_GAME_SCALE = 2.55;
       const BANDIT_MENU_Y_OFFSET = 8;
       const BANDIT_GAME_Y_OFFSET = 4;
+      const BANDIT_MENU_FOOT_PAD = 2;
 
       // ============================================================
       // Utility helpers
@@ -1404,7 +1407,10 @@
 
           const centerX = GAME_W / 2;
           const platformY = 520;
-          const banditY = platformY - 58 - Math.abs(Math.sin((time / MENU_BOUNCE_PERIOD) * Math.PI)) * MENU_BOUNCE_HEIGHT;
+          // Keep Billy's boots kissing the platform even if we tweak scale/frame size.
+          const bounce = Math.abs(Math.sin((time / MENU_BOUNCE_PERIOD) * Math.PI)) * MENU_BOUNCE_HEIGHT;
+          const bootToOrigin = (1 - BANDIT_SPRITE_ORIGIN_Y) * BANDIT_FRAME_H * BANDIT_MENU_SCALE;
+          const banditY = platformY - BANDIT_MENU_FOOT_PAD - BANDIT_MENU_Y_OFFSET - bootToOrigin - bounce;
           const previewState = {
             x: centerX,
             y: banditY,
@@ -3893,31 +3899,32 @@
         const x = state.x;
         const y = state.y + BANDIT_GAME_Y_OFFSET;
         const avgScale = (state.scaleX + state.scaleY) * 0.5;
+        const renderScale = BANDIT_GAME_SCALE * avgScale;
         const facing = state.dir < 0 ? -1 : 1;
 
         if (state.shield) {
           const pulse = 1 + Math.sin(time * 0.008) * 0.035;
-          const shellW = 108 * avgScale * pulse;
-          const shellH = 135 * avgScale * (1 - Math.sin(time * 0.008) * 0.02);
-          const shellY = y - 2 * avgScale;
+          const shellW = 108 * renderScale * pulse;
+          const shellH = 135 * renderScale * (1 - Math.sin(time * 0.008) * 0.02);
+          const shellY = y - 2 * renderScale;
           g.fillStyle(0x64A0DC, 0.12);
           g.fillEllipse(x, shellY, shellW, shellH);
           g.lineStyle(3, 0xFFFFFF, 0.34);
           g.strokeEllipse(x, shellY, shellW, shellH);
           g.lineStyle(2, 0x64A0DC, 0.65);
-          g.strokeEllipse(x, shellY, shellW - 6 * avgScale, shellH - 8 * avgScale);
+          g.strokeEllipse(x, shellY, shellW - 6 * renderScale, shellH - 8 * renderScale);
         }
 
         if (state.jetpack) {
           for (let i = 0; i < 4; i += 1) {
             g.fillStyle(COLORS.poncho, 0.2 + i * 0.08);
-            g.fillCircle(x - 8 + i * 5, y + 24 + i * 7, (8 + i * 2) * avgScale);
+            g.fillCircle(x - 8 + i * 5, y + 24 + i * 7, (8 + i * 2) * renderScale);
           }
         }
 
         if (state.rocket) {
           g.fillStyle(COLORS.gold, 0.78);
-          g.fillCircle(x - 4 * facing, y + 22, 8 * avgScale);
+          g.fillCircle(x - 4 * facing, y + 22, 8 * renderScale);
           g.fillStyle(COLORS.rust, 1);
           g.fillTriangle(x - 12 * facing, y + 16, x - 4 * facing, y, x + 4 * facing, y + 16);
           g.lineStyle(2, COLORS.ink, 1);
@@ -3925,12 +3932,12 @@
         }
 
         if (state.shooting) {
-          drawStar(g, x + facing * 27, y + 8, 2 * avgScale, 7 * avgScale, 4, Math.PI / 4, COLORS.gold, COLORS.gold, 1);
+          drawStar(g, x + facing * 27, y + 8, 2 * renderScale, 7 * renderScale, 4, Math.PI / 4, COLORS.gold, COLORS.gold, 1);
         }
 
         if (state.flash) {
           g.fillStyle(COLORS.white, 0.3);
-          g.fillCircle(x, y, 30 * avgScale);
+          g.fillCircle(x, y, 30 * renderScale);
         }
       }
 
@@ -3942,6 +3949,7 @@
         const x = state.x;
         const y = state.y + BANDIT_GAME_Y_OFFSET;
         const avgScale = (state.scaleX + state.scaleY) * 0.5;
+        const renderScale = BANDIT_GAME_SCALE * avgScale;
         const rising = state.vy < -50;
         const falling = state.vy > 120;
         const hatOffsetY = rising ? -2 : falling ? 2 : 0;
@@ -3952,9 +3960,9 @@
         const rotorDy = Math.sin(rotorAngle) * 3;
 
         g.fillStyle(COLORS.teal, 1);
-        g.fillEllipse(x + hatShift, y - 28 + hatOffsetY, 28 * state.scaleX, 10 * state.scaleY);
+        g.fillEllipse(x + hatShift, y - 28 + hatOffsetY, 28 * renderScale, 10 * renderScale);
         g.lineStyle(OUTLINE_W, COLORS.ink, 1);
-        g.strokeEllipse(x + hatShift, y - 28 + hatOffsetY, 28 * state.scaleX, 10 * state.scaleY);
+        g.strokeEllipse(x + hatShift, y - 28 + hatOffsetY, 28 * renderScale, 10 * renderScale);
         g.beginPath();
         g.moveTo(x + hatShift, y - 38 + hatOffsetY);
         g.lineTo(x + hatShift, y - 26 + hatOffsetY);
@@ -3971,7 +3979,7 @@
 
         if (state.flash) {
           g.fillStyle(COLORS.white, 0.16);
-          g.fillEllipse(x + hatShift, y - 28 + hatOffsetY, 30 * avgScale, 12 * avgScale);
+          g.fillEllipse(x + hatShift, y - 28 + hatOffsetY, 30 * renderScale, 12 * renderScale);
         }
       }
 
