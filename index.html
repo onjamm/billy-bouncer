@@ -3637,6 +3637,7 @@
 
           const prevBottom = (this.prevPlayerY ?? this.player.y) + PLAYER_BODY_H / 2;
           const currBottom = this.player.y + PLAYER_BODY_H / 2;
+          const viewBottom = this.cameras.main.scrollY + GAME_H;
 
           for (const platform of this.platforms) {
             if (!platform.active || !platform.visible || platform.exploded) {
@@ -3644,6 +3645,10 @@
             }
 
             const top = platform.y - platform.h / 2;
+            // If a platform is fully below the viewport, don't allow "blind" saves.
+            if (top > viewBottom + 2) {
+              continue;
+            }
             const overlapX = Math.abs(this.player.x - platform.x) < platform.w / 2 + PLAYER_BODY_W / 2 - 4;
             const crossedTop = prevBottom <= top + LANDING_TOLERANCE && currBottom >= top - 2;
 
