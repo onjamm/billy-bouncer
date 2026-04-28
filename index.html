@@ -1917,33 +1917,76 @@
             submit: { x: cx, y: GAME_OVER_SUBMIT_Y, w: 240, h: 28 }
           };
           this.overlayHitAreas = { submitBoardHit: this.submitBoardHit, rideHit, saloonHit };
+          this.gameOverSelection = "ride";
 
           // DOM buttons — reliable on all mobile browsers, positioned over the Phaser visuals
           const makeOverlayDOMBtn = () => {
             const btn = document.createElement("button");
             btn.type = "button";
+            btn.tabIndex = 0;
             Object.assign(btn.style, {
               position: "fixed",
               zIndex: "210",
               display: "none",
               background: "transparent",
               border: "none",
-              outline: "none",
               cursor: "pointer",
               touchAction: "manipulation",
               WebkitTapHighlightColor: "transparent",
               padding: "0",
-              margin: "0"
+              margin: "0",
+              // Visible focus indicator for keyboard users (the button itself is transparent).
+              outline: "3px solid transparent",
+              outlineOffset: "3px",
+              borderRadius: "6px"
             });
             document.body.appendChild(btn);
             return btn;
           };
           this.domRideBtn = makeOverlayDOMBtn();
           this.domSaloonBtn = makeOverlayDOMBtn();
-          this.domRideBtn.addEventListener("touchend", (e) => { e.preventDefault(); this.scene.restart(); });
-          this.domRideBtn.addEventListener("click", () => this.scene.restart());
-          this.domSaloonBtn.addEventListener("touchend", (e) => { e.preventDefault(); this.scene.start("menu"); });
-          this.domSaloonBtn.addEventListener("click", () => this.scene.start("menu"));
+          this.domRideBtn.setAttribute("aria-label", "Ride again");
+          this.domSaloonBtn.setAttribute("aria-label", "Saloon");
+          this.domRideBtn.addEventListener("focus", () => {
+            this.gameOverSelection = "ride";
+            this.domRideBtn.style.outlineColor = "rgba(28, 18, 8, 0.78)";
+            this.domSaloonBtn.style.outlineColor = "transparent";
+          });
+          this.domSaloonBtn.addEventListener("focus", () => {
+            this.gameOverSelection = "saloon";
+            this.domSaloonBtn.style.outlineColor = "rgba(28, 18, 8, 0.78)";
+            this.domRideBtn.style.outlineColor = "transparent";
+          });
+          const activateRideAgainDOM = (e) => { if (e && e.preventDefault) e.preventDefault(); this.scene.restart(); };
+          const activateSaloonDOM = (e) => { if (e && e.preventDefault) e.preventDefault(); this.scene.start("menu"); };
+          this.domRideBtn.addEventListener("touchend", activateRideAgainDOM, { passive: false });
+          this.domRideBtn.addEventListener("click", activateRideAgainDOM);
+          this.domSaloonBtn.addEventListener("touchend", activateSaloonDOM, { passive: false });
+          this.domSaloonBtn.addEventListener("click", activateSaloonDOM);
+
+          // Keyboard: Tab cycles buttons; Enter/Space activates focused option.
+          this.onGameOverDOMKeyDown = (event) => {
+            if (!this.gameOverShown || !this.overlay || !this.overlay.visible) return;
+            if (!this.domRideBtn || !this.domSaloonBtn) return;
+
+            if (event.key === "Tab") {
+              event.preventDefault();
+              const forward = !event.shiftKey;
+              const active = document.activeElement;
+              if (forward) {
+                (active === this.domRideBtn ? this.domSaloonBtn : this.domRideBtn).focus();
+              } else {
+                (active === this.domSaloonBtn ? this.domRideBtn : this.domSaloonBtn).focus();
+              }
+              return;
+            }
+
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              this.activateGameOverSelection();
+            }
+          };
+          document.addEventListener("keydown", this.onGameOverDOMKeyDown, true);
         }
 
         positionGameOverDOMButtons() {
@@ -1971,6 +2014,17 @@
           if (this.domSaloonBtn) this.domSaloonBtn.style.display = "none";
         }
 
+        activateGameOverSelection() {
+          if (!this.gameOverShown || !this.overlay || !this.overlay.visible || this.overlay.alpha < 0.9) {
+            return;
+          }
+          if (this.gameOverSelection === "saloon") {
+            this.scene.start("menu");
+            return;
+          }
+          this.scene.restart();
+        }
+
         setLeaderboardSubmitVisible(visible) {
           const nextVisible = !!visible;
           this.submitBoardText.setVisible(nextVisible);
@@ -1987,7 +2041,13 @@
             alpha: 1,
             duration: 400,
             ease: "Quad.Out",
-            onComplete: () => this.positionGameOverDOMButtons()
+            onComplete: () => {
+              this.positionGameOverDOMButtons();
+              if (this.domRideBtn) {
+                // Default selection for keyboard users.
+                this.domRideBtn.focus();
+              }
+            }
           });
         }
 
@@ -3299,7 +3359,7 @@
         checkShotInput(time) {
           if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE) || Phaser.Input.Keyboard.JustDown(this.keys.ENTER)) {
             if (this.gameOverShown) {
-              this.scene.restart();
+              this.activateGameOverSelection();
               return;
             }
             this.tryShoot(this.player.x, this.player.y - 400);
@@ -3657,6 +3717,10 @@
           }
           if (this.onCanvasTouchStart && this.game && this.game.canvas) {
             this.game.canvas.removeEventListener("touchstart", this.onCanvasTouchStart);
+          }
+          if (this.onGameOverDOMKeyDown) {
+            document.removeEventListener("keydown", this.onGameOverDOMKeyDown, true);
+            this.onGameOverDOMKeyDown = null;
           }
           if (this.domRideBtn) { this.domRideBtn.remove(); this.domRideBtn = null; }
           if (this.domSaloonBtn) { this.domSaloonBtn.remove(); this.domSaloonBtn = null; }
