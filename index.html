@@ -257,7 +257,7 @@
       const LATE_X_CHALLENGE = 0.72;
       const MIN_SPAWN_X_OFFSET = 18;
       const SAFE_OPENING_ALTITUDE = 540;
-      const SAFE_ENEMY_START_ALTITUDE = 900;
+      const SAFE_ENEMY_START_ALTITUDE = 720;
       const SAFE_BLACK_HOLE_START_ALTITUDE = 2200;
       const PLAYFIELD_MIN_X = PLATFORM_EDGE_PADDING;
       const PLAYFIELD_MAX_X = GAME_W - PLATFORM_EDGE_PADDING;
@@ -2856,12 +2856,12 @@
 
         getEnemyScreenCap(altitude) {
           if (altitude < 2200) {
-            return 2;
-          }
-          if (altitude < 4500) {
             return 3;
           }
-          return 4;
+          if (altitude < 4500) {
+            return 4;
+          }
+          return 5;
         }
 
         choosePlatformEnemyX(platform, enemyWidth) {
@@ -3071,7 +3071,8 @@
         }
 
         maybeSpawnEnemy(platform, altitude) {
-          if (platform.safe || altitude < SAFE_ENEMY_START_ALTITUDE || this.playerState.repellentUntil > this.time.now || Math.random() > map(altitude, 0, 7000, 0.08, 0.18)) {
+          // Enemy spawn rate scales with altitude; keep the early band calmer but avoid long "dead" vertical stretches.
+          if (platform.safe || altitude < SAFE_ENEMY_START_ALTITUDE || this.playerState.repellentUntil > this.time.now || Math.random() > map(altitude, 0, 7000, 0.12, 0.26)) {
             return;
           }
 
