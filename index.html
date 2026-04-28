@@ -331,6 +331,7 @@
       const BANDIT_MENU_Y_OFFSET = 8;
       const BANDIT_GAME_Y_OFFSET = 4;
       const BANDIT_MENU_FOOT_PAD = 2;
+      const BANDIT_BASE_SCALE = 2.2;
 
       // ============================================================
       // Utility helpers
@@ -4134,36 +4135,41 @@
         const y = state.y + BANDIT_GAME_Y_OFFSET;
         const avgScale = (state.scaleX + state.scaleY) * 0.5;
         const renderScale = BANDIT_GAME_SCALE * avgScale;
+        // Keep the propeller hat aligned as Billy's visual scale changes.
+        const propellerPosScale = renderScale / BANDIT_BASE_SCALE;
         const rising = state.vy < -50;
         const falling = state.vy > 120;
-        const hatOffsetY = rising ? -2 : falling ? 2 : 0;
+        const hatOffsetY = (rising ? -2 : falling ? 2 : 0) * propellerPosScale;
         const moveIntent = clamp((state.vx || 0) / PLAYER_SPEED, -1, 1);
         const hatShift = moveIntent * 6 * 0.7;
         const rotorAngle = time * 0.04;
-        const rotorDx = Math.cos(rotorAngle) * 14;
-        const rotorDy = Math.sin(rotorAngle) * 3;
+        const rotorDx = Math.cos(rotorAngle) * 14 * propellerPosScale;
+        const rotorDy = Math.sin(rotorAngle) * 3 * propellerPosScale;
+        const brimY = y - 28 * propellerPosScale + hatOffsetY;
+        const rotorY = y - 38 * propellerPosScale + hatOffsetY;
+        const stemBottomY = y - 26 * propellerPosScale + hatOffsetY;
 
         g.fillStyle(COLORS.teal, 1);
-        g.fillEllipse(x + hatShift, y - 28 + hatOffsetY, 28 * renderScale, 10 * renderScale);
+        g.fillEllipse(x + hatShift, brimY, 28 * renderScale, 10 * renderScale);
         g.lineStyle(OUTLINE_W, COLORS.ink, 1);
-        g.strokeEllipse(x + hatShift, y - 28 + hatOffsetY, 28 * renderScale, 10 * renderScale);
+        g.strokeEllipse(x + hatShift, brimY, 28 * renderScale, 10 * renderScale);
         g.beginPath();
-        g.moveTo(x + hatShift, y - 38 + hatOffsetY);
-        g.lineTo(x + hatShift, y - 26 + hatOffsetY);
+        g.moveTo(x + hatShift, rotorY);
+        g.lineTo(x + hatShift, stemBottomY);
         g.strokePath();
         g.beginPath();
-        g.moveTo(x - rotorDx + hatShift, y - 38 + hatOffsetY - rotorDy);
-        g.lineTo(x + rotorDx + hatShift, y - 38 + hatOffsetY + rotorDy);
+        g.moveTo(x - rotorDx + hatShift, rotorY - rotorDy);
+        g.lineTo(x + rotorDx + hatShift, rotorY + rotorDy);
         g.strokePath();
         g.lineStyle(2, COLORS.ink, 0.35);
         g.beginPath();
-        g.moveTo(x - 10 + hatShift, y - 38 + hatOffsetY);
-        g.lineTo(x + 10 + hatShift, y - 38 + hatOffsetY);
+        g.moveTo(x - 10 * propellerPosScale + hatShift, rotorY);
+        g.lineTo(x + 10 * propellerPosScale + hatShift, rotorY);
         g.strokePath();
 
         if (state.flash) {
           g.fillStyle(COLORS.white, 0.16);
-          g.fillEllipse(x + hatShift, y - 28 + hatOffsetY, 30 * renderScale, 12 * renderScale);
+          g.fillEllipse(x + hatShift, brimY, 30 * renderScale, 12 * renderScale);
         }
       }
 
