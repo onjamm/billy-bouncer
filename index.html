@@ -110,6 +110,9 @@
       const COIN_BOB_SPEED = 0.008;
       const PICKUP_BOB_SPEED = 0.005;
       const MENU_PROMPT_SPEED = 0.004;
+      const MENU_START_BTN_Y = 620;
+      const MENU_START_BTN_W = 320;
+      const MENU_START_BTN_H = 54;
       const THEME_BLEND = 200;
       const BEST_SCORE_KEY = "billy_bouncer_best";
       const LEADERBOARD_HANDLE_KEY = "billy_bouncer_handle";
@@ -1257,12 +1260,119 @@
           };
           this.input.on("pointerdown", this.onMenuPointerDown);
           this.input.keyboard.once("keydown-SPACE", () => this.startGame());
+          this.input.keyboard.once("keydown-ENTER", () => this.startGame());
+
+          this.createMenuDOMButtons();
 
           if (showTiltButton) {
             this.createMotionButton();
           }
           if (canUseOnlineLeaderboard()) {
             void this.loadLeaderboard();
+          }
+        }
+
+        createMenuDOMButtons() {
+          if (typeof document === "undefined") return;
+          if (!this.game || !this.game.canvas) return;
+          if (this.domMenuStartBtn) return;
+
+          const makeBtn = (ariaLabel) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.tabIndex = 0;
+            btn.setAttribute("aria-label", ariaLabel);
+            Object.assign(btn.style, {
+              position: "fixed",
+              zIndex: "120",
+              display: "none",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              touchAction: "manipulation",
+              WebkitTapHighlightColor: "transparent",
+              padding: "0",
+              margin: "0",
+              outline: "3px solid transparent",
+              outlineOffset: "3px",
+              borderRadius: "8px"
+            });
+            btn.addEventListener("focus", () => {
+              btn.style.outlineColor = "rgba(28, 18, 8, 0.78)";
+            });
+            btn.addEventListener("blur", () => {
+              btn.style.outlineColor = "transparent";
+            });
+            document.body.appendChild(btn);
+            return btn;
+          };
+
+          this.domMenuStartBtn = makeBtn("Start game");
+          this.domMenuBoardBtn = makeBtn("Toggle leaderboard");
+          this.domMenuBoardCloseBtn = makeBtn("Close leaderboard");
+
+          const start = (e) => {
+            if (e && e.preventDefault) e.preventDefault();
+            if (this.menuRequiresExplicitTilt) return;
+            void this.startGame();
+          };
+          const toggleBoard = (e) => {
+            if (e && e.preventDefault) e.preventDefault();
+            this.setBoardOpen(!this.boardOpen);
+            this.positionMenuDOMButtons();
+            if (this.boardOpen && this.domMenuBoardCloseBtn) {
+              this.domMenuBoardCloseBtn.focus();
+            }
+          };
+          const closeBoard = (e) => {
+            if (e && e.preventDefault) e.preventDefault();
+            this.setBoardOpen(false);
+            this.positionMenuDOMButtons();
+            if (this.domMenuBoardBtn) {
+              this.domMenuBoardBtn.focus();
+            }
+          };
+
+          this.domMenuStartBtn.addEventListener("click", start);
+          this.domMenuStartBtn.addEventListener("touchend", start, { passive: false });
+          this.domMenuBoardBtn.addEventListener("click", toggleBoard);
+          this.domMenuBoardBtn.addEventListener("touchend", toggleBoard, { passive: false });
+          this.domMenuBoardCloseBtn.addEventListener("click", closeBoard);
+          this.domMenuBoardCloseBtn.addEventListener("touchend", closeBoard, { passive: false });
+
+          // Keep buttons lined up with the canvas even after mobile viewport changes.
+          this.positionMenuDOMButtons = () => this.positionMenuDOMButtonsImpl();
+          window.addEventListener("resize", this.positionMenuDOMButtons);
+          this.positionMenuDOMButtons();
+        }
+
+        positionMenuDOMButtonsImpl() {
+          if (!this.domMenuStartBtn || !this.domMenuBoardBtn || !this.game || !this.game.canvas) return;
+          const rect = this.game.canvas.getBoundingClientRect();
+          const sx = rect.width / GAME_W;
+          const sy = rect.height / GAME_H;
+
+          const place = (btn, bounds) => {
+            const left = rect.left + (bounds.x - bounds.w / 2) * sx;
+            const top = rect.top + (bounds.y - bounds.h / 2) * sy;
+            btn.style.left = `${left}px`;
+            btn.style.top = `${top}px`;
+            btn.style.width = `${bounds.w * sx}px`;
+            btn.style.height = `${bounds.h * sy}px`;
+            btn.style.display = "block";
+          };
+
+          if (this.menuRequiresExplicitTilt) {
+            this.domMenuStartBtn.style.display = "none";
+          } else {
+            place(this.domMenuStartBtn, { x: GAME_W / 2, y: MENU_START_BTN_Y, w: MENU_START_BTN_W, h: MENU_START_BTN_H });
+          }
+          place(this.domMenuBoardBtn, this.boardButtonBounds);
+
+          if (this.boardOpen) {
+            place(this.domMenuBoardCloseBtn, this.boardCloseBounds);
+          } else {
+            this.domMenuBoardCloseBtn.style.display = "none";
           }
         }
 
@@ -1311,6 +1421,13 @@
           if (this.onMenuPointerDown) {
             this.input.off("pointerdown", this.onMenuPointerDown);
           }
+          if (this.positionMenuDOMButtons) {
+            window.removeEventListener("resize", this.positionMenuDOMButtons);
+            this.positionMenuDOMButtons = null;
+          }
+          if (this.domMenuStartBtn) { this.domMenuStartBtn.remove(); this.domMenuStartBtn = null; }
+          if (this.domMenuBoardBtn) { this.domMenuBoardBtn.remove(); this.domMenuBoardBtn = null; }
+          if (this.domMenuBoardCloseBtn) { this.domMenuBoardCloseBtn.remove(); this.domMenuBoardCloseBtn = null; }
           if (this.motionButton) {
             this.motionButton.removeEventListener("touchend", this.onMotionButtonPress);
             this.motionButton.removeEventListener("click", this.onMotionButtonPress);
@@ -1378,6 +1495,9 @@
           this.boardPanelTitle.setVisible(visible);
           this.boardCloseText.setVisible(visible);
           this.boardList.setVisible(visible);
+          if (this.positionMenuDOMButtons) {
+            this.positionMenuDOMButtons();
+          }
         }
 
         handleMenuPointer(pointer) {
