@@ -40,6 +40,106 @@
       letter-spacing: 0;
       touch-action: manipulation;
     }
+
+    .menu-volume-panel {
+      position: fixed;
+      z-index: 140;
+      display: none;
+      box-sizing: border-box;
+      border: 3px solid #1C1208;
+      background: rgba(244, 228, 188, 0.96);
+      border-radius: 12px;
+      box-shadow: 4px 4px 0 rgba(184, 48, 32, 0.25);
+      padding: 8px 10px;
+      pointer-events: auto;
+      backdrop-filter: blur(1px);
+    }
+
+    .menu-volume-panel::before {
+      content: "";
+      position: absolute;
+      top: -8px;
+      left: 18px;
+      width: 14px;
+      height: 14px;
+      background: rgba(244, 228, 188, 0.96);
+      transform: rotate(45deg);
+      border-left: 3px solid #1C1208;
+      border-top: 3px solid #1C1208;
+    }
+
+    .menu-volume-gauge {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      top: 50%;
+      height: 8px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background:
+        repeating-linear-gradient(
+          to right,
+          rgba(28, 18, 8, 0.18) 0 1px,
+          transparent 1px 16px
+        );
+      pointer-events: none;
+      opacity: 0.8;
+    }
+
+    .menu-volume-range {
+      position: relative;
+      width: 100%;
+      margin: 0;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 18px;
+      cursor: pointer;
+      touch-action: none;
+      outline: none;
+    }
+
+    .menu-volume-range:focus-visible {
+      outline: 3px solid rgba(28, 18, 8, 0.78);
+      outline-offset: 4px;
+      border-radius: 10px;
+    }
+
+    .menu-volume-range::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 999px;
+      border: 2px solid rgba(28, 18, 8, 0.65);
+      background: linear-gradient(180deg, rgba(238, 218, 168, 1), rgba(229, 204, 150, 1));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    }
+
+    .menu-volume-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 10px;
+      border: 2px solid rgba(28, 18, 8, 0.75);
+      background: linear-gradient(180deg, rgba(61, 125, 125, 1), rgba(47, 98, 98, 1));
+      box-shadow: 2px 2px 0 rgba(28, 18, 8, 0.15);
+      margin-top: -7px;
+    }
+
+    .menu-volume-range::-moz-range-track {
+      height: 8px;
+      border-radius: 999px;
+      border: 2px solid rgba(28, 18, 8, 0.65);
+      background: linear-gradient(180deg, rgba(238, 218, 168, 1), rgba(229, 204, 150, 1));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    }
+
+    .menu-volume-range::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 10px;
+      border: 2px solid rgba(28, 18, 8, 0.75);
+      background: linear-gradient(180deg, rgba(61, 125, 125, 1), rgba(47, 98, 98, 1));
+      box-shadow: 2px 2px 0 rgba(28, 18, 8, 0.15);
+    }
   </style>
 </head>
 <body>
@@ -117,6 +217,10 @@
       const BEST_SCORE_KEY = "billy_bouncer_best";
       const LEADERBOARD_HANDLE_KEY = "billy_bouncer_handle";
       const LEADERBOARD_LAST_SUBMITTED_KEY = "billy_bouncer_last_submitted";
+      const VOLUME_KEY = "billy_bouncer_volume";
+      const DEFAULT_VOLUME = 0.75; // matches the old perceived loudness (~0.22 master gain)
+      const VOLUME_MAX_GAIN = 0.36;
+      const VOLUME_CURVE = 1.7; // perceptual curve: more resolution at the quiet end
       const OUTLINE_W = 4;
       const MENU_BOUNCE_HEIGHT = 78;
       const MENU_BOUNCE_PERIOD = 920;
@@ -719,6 +823,37 @@
           this.rumbleOsc = null;
           this.rumbleGain = null;
           this.unlocked = false;
+          this.volume = DEFAULT_VOLUME;
+          try {
+            const saved = Number(localStorage.getItem(VOLUME_KEY));
+            if (Number.isFinite(saved)) {
+              this.volume = clamp(saved, 0, 1);
+            }
+          } catch (error) {
+            // localStorage can be unavailable in some embedded contexts; fall back to default.
+          }
+        }
+
+        getVolume() {
+          return clamp(this.volume, 0, 1);
+        }
+
+        setVolume(next) {
+          const value = clamp(Number(next), 0, 1);
+          this.volume = value;
+          try {
+            localStorage.setItem(VOLUME_KEY, String(value));
+          } catch (error) {}
+          this.applyVolume();
+        }
+
+        applyVolume() {
+          if (!this.master) {
+            return;
+          }
+          const v = this.getVolume();
+          const gain = VOLUME_MAX_GAIN * Math.pow(v, VOLUME_CURVE);
+          this.master.gain.value = gain;
         }
 
         unlock() {
@@ -729,7 +864,7 @@
             }
             this.ctx = new Ctx();
             this.master = this.ctx.createGain();
-            this.master.gain.value = 0.22;
+            this.applyVolume();
             this.master.connect(this.ctx.destination);
           }
           if (this.ctx.state !== "running") {
@@ -1107,6 +1242,50 @@
         g.strokePath();
       }
 
+      function drawMenuVolumeIcon(g, x, y, scale, volume) {
+        g.clear();
+        const ink = COLORS.ink;
+        const alpha = 0.92;
+        const s = scale;
+        const v = clamp(volume, 0, 1);
+
+        g.fillStyle(ink, alpha);
+        g.lineStyle(2, ink, alpha);
+
+        // Speaker body + horn.
+        g.fillRect(x - 14 * s, y - 6 * s, 6 * s, 12 * s);
+        g.beginPath();
+        g.moveTo(x - 8 * s, y - 7 * s);
+        g.lineTo(x + 2 * s, y - 12 * s);
+        g.lineTo(x + 2 * s, y + 12 * s);
+        g.lineTo(x - 8 * s, y + 7 * s);
+        g.closePath();
+        g.fillPath();
+        g.strokePath();
+
+        if (v <= 0.01) {
+          // Mute mark.
+          g.lineStyle(3, ink, 0.85);
+          g.beginPath();
+          g.moveTo(x + 7 * s, y - 9 * s);
+          g.lineTo(x + 15 * s, y + 9 * s);
+          g.strokePath();
+          g.beginPath();
+          g.moveTo(x + 15 * s, y - 9 * s);
+          g.lineTo(x + 7 * s, y + 9 * s);
+          g.strokePath();
+          return;
+        }
+
+        const waveCount = v < 0.45 ? 1 : v < 0.8 ? 2 : 3;
+        for (let i = 0; i < waveCount; i += 1) {
+          const r = (7 + i * 5) * s;
+          g.beginPath();
+          g.arc(x + 2 * s, y, r, -0.62, 0.62, false);
+          g.strokePath();
+        }
+      }
+
       // ============================================================
       // Menu scene
       // ============================================================
@@ -1161,6 +1340,14 @@
           const boardCloseX = boardPanelX + boardPanelW / 2 - 18;
           const boardListY = boardPanelTop + 68;
           const boardWrapW = mobileBoard ? 172 : 110;
+          const volumeButtonX = mobileBoard ? 92 : 98;
+          const volumeButtonY = boardButtonY;
+          const volumeButtonW = mobileBoard ? 44 : 46;
+          const volumeButtonH = boardButtonH;
+          const volumePanelW = mobileBoard ? 204 : 220;
+          const volumePanelH = 34;
+          const volumePanelX = volumeButtonX - volumeButtonW / 2 + volumePanelW / 2;
+          const volumePanelY = volumeButtonY + volumeButtonH / 2 + volumePanelH / 2 + 4;
 
           this.titleShadow = this.add.text(centerX + 4, 132 + 4, "BILLY BOUNCER", {
             fontFamily: "Georgia, serif",
@@ -1222,6 +1409,16 @@
             color: CSS.ink
           }).setOrigin(0.5).setStroke("#F4E4BC", 2);
 
+          this.volumeButtonBox = this.add.rectangle(volumeButtonX, volumeButtonY, volumeButtonW, volumeButtonH, COLORS.parchment, 0.96)
+            .setStrokeStyle(3, COLORS.ink, 0.72);
+          this.volumeButtonIcon = this.add.graphics();
+          const volumeIconScale = mobileBoard ? 0.92 : 0.98;
+          this.updateMenuVolumeIcon = () => {
+            if (!this.volumeButtonIcon) return;
+            drawMenuVolumeIcon(this.volumeButtonIcon, volumeButtonX, volumeButtonY, volumeIconScale, this.audio.getVolume());
+          };
+          this.updateMenuVolumeIcon();
+
           this.boardPanel = this.add.rectangle(boardPanelX, boardPanelY, boardPanelW, boardPanelH, COLORS.parchment, 0.97)
             .setStrokeStyle(3, COLORS.ink, 0.5)
             .setVisible(false);
@@ -1250,6 +1447,9 @@
           this.boardCloseBounds = { x: boardCloseX, y: boardCloseY, w: 24, h: 24 };
           this.boardPanelBounds = { x: boardPanelX, y: boardPanelY, w: boardPanelW, h: boardPanelH };
           this.boardOpen = false;
+          this.volumeButtonBounds = { x: volumeButtonX, y: volumeButtonY, w: volumeButtonW, h: volumeButtonH };
+          this.volumePanelBounds = { x: volumePanelX, y: volumePanelY, w: volumePanelW, h: volumePanelH };
+          this.volumeOpen = false;
 
           this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
           this.menuRequiresExplicitTilt = showTiltButton;
@@ -1257,13 +1457,29 @@
             if (this.handleMenuPointer(pointer)) {
               return;
             }
+            if (this.volumeOpen) {
+              this.setVolumeOpen(false);
+              return;
+            }
             if (!this.menuRequiresExplicitTilt) {
               void this.startGame();
             }
           };
           this.input.on("pointerdown", this.onMenuPointerDown);
-          this.input.keyboard.once("keydown-SPACE", () => this.startGame());
-          this.input.keyboard.once("keydown-ENTER", () => this.startGame());
+          this.onMenuStartKey = () => {
+            if (this.starting) return;
+            if (this.menuRequiresExplicitTilt) return;
+            if (this.boardOpen || this.volumeOpen) return;
+            if (typeof document !== "undefined" && document.activeElement) {
+              const tag = String(document.activeElement.tagName || "").toUpperCase();
+              if (tag === "INPUT" || tag === "BUTTON" || tag === "TEXTAREA" || tag === "SELECT") {
+                return;
+              }
+            }
+            void this.startGame();
+          };
+          this.input.keyboard.on("keydown-SPACE", this.onMenuStartKey);
+          this.input.keyboard.on("keydown-ENTER", this.onMenuStartKey);
 
           this.createMenuDOMButtons();
 
@@ -1313,6 +1529,46 @@
           this.domMenuStartBtn = makeBtn("Start game");
           this.domMenuBoardBtn = makeBtn("Toggle leaderboard");
           this.domMenuBoardCloseBtn = makeBtn("Close leaderboard");
+          this.domMenuVolumeBtn = makeBtn("Adjust volume");
+
+          this.domMenuVolumePanel = document.createElement("div");
+          this.domMenuVolumePanel.className = "menu-volume-panel";
+          this.domMenuVolumePanel.setAttribute("role", "group");
+          this.domMenuVolumePanel.setAttribute("aria-label", "Volume");
+          this.domMenuVolumePanel.style.display = "none";
+
+          const gauge = document.createElement("div");
+          gauge.className = "menu-volume-gauge";
+
+          const range = document.createElement("input");
+          range.className = "menu-volume-range";
+          range.type = "range";
+          range.min = "0";
+          range.max = "100";
+          range.step = "1";
+          range.value = String(Math.round((this.audio ? this.audio.getVolume() : DEFAULT_VOLUME) * 100));
+          range.setAttribute("aria-label", "Volume");
+          range.addEventListener("input", () => {
+            const value = clamp(Number(range.value) / 100, 0, 1);
+            if (this.audio && this.audio.setVolume) {
+              this.audio.setVolume(value);
+            }
+            if (this.updateMenuVolumeIcon) {
+              this.updateMenuVolumeIcon();
+            }
+          });
+          range.addEventListener("keydown", (e) => {
+            if (e && e.key === "Escape") {
+              this.setVolumeOpen(false);
+              if (this.domMenuVolumeBtn) {
+                this.domMenuVolumeBtn.focus();
+              }
+            }
+          });
+
+          this.domMenuVolumePanel.append(gauge, range);
+          document.body.appendChild(this.domMenuVolumePanel);
+          this.domMenuVolumeRange = range;
 
           const start = (e) => {
             if (e && e.preventDefault) e.preventDefault();
@@ -1335,6 +1591,14 @@
               this.domMenuBoardBtn.focus();
             }
           };
+          const toggleVolume = (e) => {
+            if (e && e.preventDefault) e.preventDefault();
+            this.setVolumeOpen(!this.volumeOpen);
+            if (this.volumeOpen && this.domMenuVolumeRange) {
+              this.domMenuVolumeRange.value = String(Math.round((this.audio ? this.audio.getVolume() : DEFAULT_VOLUME) * 100));
+              this.domMenuVolumeRange.focus();
+            }
+          };
 
           this.domMenuStartBtn.addEventListener("click", start);
           this.domMenuStartBtn.addEventListener("touchend", start, { passive: false });
@@ -1342,11 +1606,23 @@
           this.domMenuBoardBtn.addEventListener("touchend", toggleBoard, { passive: false });
           this.domMenuBoardCloseBtn.addEventListener("click", closeBoard);
           this.domMenuBoardCloseBtn.addEventListener("touchend", closeBoard, { passive: false });
+          this.domMenuVolumeBtn.addEventListener("click", toggleVolume);
+          this.domMenuVolumeBtn.addEventListener("touchend", toggleVolume, { passive: false });
 
           // Keep buttons lined up with the canvas even after mobile viewport changes.
           this.positionMenuDOMButtons = () => this.positionMenuDOMButtonsImpl();
           window.addEventListener("resize", this.positionMenuDOMButtons);
           this.positionMenuDOMButtons();
+        }
+
+        setVolumeOpen(open) {
+          this.volumeOpen = !!open;
+          if (this.domMenuVolumePanel) {
+            this.domMenuVolumePanel.style.display = this.volumeOpen ? "block" : "none";
+          }
+          if (this.positionMenuDOMButtons) {
+            this.positionMenuDOMButtons();
+          }
         }
 
         positionMenuDOMButtonsImpl() {
@@ -1374,6 +1650,16 @@
             place(this.domMenuStartBtn, { x: GAME_W / 2, y: MENU_START_BTN_Y, w, h });
           }
           place(this.domMenuBoardBtn, this.boardButtonBounds);
+          if (this.domMenuVolumeBtn && this.volumeButtonBounds) {
+            place(this.domMenuVolumeBtn, this.volumeButtonBounds);
+          }
+          if (this.domMenuVolumePanel && this.volumePanelBounds) {
+            if (this.volumeOpen) {
+              place(this.domMenuVolumePanel, this.volumePanelBounds);
+            } else {
+              this.domMenuVolumePanel.style.display = "none";
+            }
+          }
 
           if (this.boardOpen) {
             place(this.domMenuBoardCloseBtn, this.boardCloseBounds);
@@ -1427,6 +1713,11 @@
           if (this.onMenuPointerDown) {
             this.input.off("pointerdown", this.onMenuPointerDown);
           }
+          if (this.onMenuStartKey) {
+            this.input.keyboard.off("keydown-SPACE", this.onMenuStartKey);
+            this.input.keyboard.off("keydown-ENTER", this.onMenuStartKey);
+            this.onMenuStartKey = null;
+          }
           if (this.positionMenuDOMButtons) {
             window.removeEventListener("resize", this.positionMenuDOMButtons);
             this.positionMenuDOMButtons = null;
@@ -1434,6 +1725,9 @@
           if (this.domMenuStartBtn) { this.domMenuStartBtn.remove(); this.domMenuStartBtn = null; }
           if (this.domMenuBoardBtn) { this.domMenuBoardBtn.remove(); this.domMenuBoardBtn = null; }
           if (this.domMenuBoardCloseBtn) { this.domMenuBoardCloseBtn.remove(); this.domMenuBoardCloseBtn = null; }
+          if (this.domMenuVolumeBtn) { this.domMenuVolumeBtn.remove(); this.domMenuVolumeBtn = null; }
+          if (this.domMenuVolumePanel) { this.domMenuVolumePanel.remove(); this.domMenuVolumePanel = null; }
+          this.domMenuVolumeRange = null;
           if (this.motionButton) {
             this.motionButton.removeEventListener("touchend", this.onMotionButtonPress);
             this.motionButton.removeEventListener("click", this.onMotionButtonPress);
@@ -1455,6 +1749,8 @@
             this.medalTrack,
             this.boardButtonBox,
             this.boardButtonText,
+            this.volumeButtonBox,
+            this.volumeButtonIcon,
             this.boardPanel,
             this.boardPanelTitle,
             this.boardCloseText,
