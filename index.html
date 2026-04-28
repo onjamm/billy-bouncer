@@ -3702,7 +3702,18 @@
           let write = 0;
           for (let i = 0; i < this.pickups.length; i += 1) {
             const pickup = this.pickups[i];
-            const hit = rectsOverlap(playerHit, { x: pickup.x, y: pickup.y, w: 28, h: 28 });
+            // Most pickups use a small generic box, but jetpack is a scaled + offset sprite.
+            const pickupHit =
+              pickup.type === "jetpack"
+                ? {
+                    x: pickup.x,
+                    y: pickup.y - 10,
+                    // Match the rendered sprite footprint (JETPACK_FRAME_* at 1.7x) with a slight trim.
+                    w: Math.round(JETPACK_FRAME_W * 1.7 * 0.9),
+                    h: Math.round(JETPACK_FRAME_H * 1.7 * 0.95)
+                  }
+                : { x: pickup.x, y: pickup.y, w: 28, h: 28 };
+            const hit = rectsOverlap(playerHit, pickupHit);
             if (!hit) {
               this.pickups[write] = pickup;
               write += 1;
