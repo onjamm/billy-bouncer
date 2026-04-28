@@ -3806,9 +3806,7 @@
             return;
           }
 
-          if (this.hasPowerupInvincibility()) {
-            return;
-          }
+          const invincible = this.hasPowerupInvincibility();
 
           const propellerActive = this.time.now < this.playerState.propellerUntil;
 
@@ -3847,6 +3845,11 @@
 
             if (propellerActive && enemy.y < this.player.y + 8) {
               this.damageEnemy(enemy, enemy.hp);
+              continue;
+            }
+
+            // Invincibility prevents the player from taking damage, but should not prevent stomps.
+            if (invincible) {
               continue;
             }
 
