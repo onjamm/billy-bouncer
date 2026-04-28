@@ -386,9 +386,8 @@
         ];
 
         for (const def of defs) {
-          if (scene.anims.exists && scene.anims.exists(def.key)) {
-            continue;
-          }
+          const already = scene.anims.exists ? scene.anims.exists(def.key) : !!(scene.anims.get && scene.anims.get(def.key));
+          if (already) continue;
           scene.anims.create({
             key: def.key,
             frames: scene.anims.generateFrameNumbers(def.sheet, { start: 0, end: def.end }),
