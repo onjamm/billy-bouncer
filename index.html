@@ -185,7 +185,6 @@
       const JUMP_VELOCITY = -680;
       const PLATFORM_SPRING_VELOCITY = -1300;
       const PICKUP_SPRING_VELOCITY = -1600;
-      const ROCKET_VELOCITY = -2600;
       const JETPACK_VELOCITY = -980;
       const PROPELLER_LIFT_VELOCITY = -430;
       const BOOTS_VELOCITY = -1360;
@@ -241,7 +240,6 @@
       const MENU_DEMO_VX = PLAYER_SPEED * 0.24;
       const SHOTGUN_SHELLS = 6;
       const JETPACK_MS = 3000;
-      const ROCKET_MS = 1500;
       const PROPELLER_MS = 3300;
       const PLATFORM_RESPAWN_MS = 2500;
       const FRAGILE_RESPAWN_MS = PLATFORM_RESPAWN_MS;
@@ -391,7 +389,6 @@
       const POWERUP_WEIGHTS = {
         spring: 18,
         jetpack: 10,
-        rocket: 8,
         propeller: 14,
         boots: 16,
         star: 15,
@@ -410,13 +407,14 @@
       const ENEMY_WEIGHTS_LOW = { snake: 48, vulture: 22, heavy: 18, ufo: 12 };
       const ENEMY_WEIGHTS_HIGH = { snake: 20, vulture: 25, heavy: 26, ufo: 29 };
 
-      // While invincible (jetpack/rocket/propeller/spring), Billy can "body-check" and delete a limited
+      // While invincible (jetpack/propeller/spring), Billy can "body-check" and delete a limited
       // number of enemies. Keeps invincibility useful without turning it into a full screen clear.
       const INVINCIBLE_ENEMY_KILLS_PER_WINDOW = 2;
 
       // Prevent the same high-impact mobility powerup from spawning back-to-back.
       // Applies while active and for a short grace period after it ends.
       const POWERUP_SELF_COOLDOWN_MS = 6500;
+      const POWERUP_PITY_ALTITUDE_GAP = 850;
       const GOONER_LINES = [
         "The law caught up eventually...",
         "Billy zigged when he should've zagged.",
@@ -486,6 +484,7 @@
       // Pixel-art pump shotgun pickup (PixelLab)
       const SHOTGUN_PICKUP_KEY = "pickup-shotgun";
       const SHOTGUN_PICKUP_URL = "assets/pickups/shotgun.png";
+
 
       // ============================================================
       // Utility helpers
@@ -2006,7 +2005,6 @@
             propeller: false,
             shield: false,
             jetpack: false,
-            rocket: false
           };
 
           this.preview.clear();
@@ -2182,7 +2180,6 @@
             shootingUntil: 0,
             flashUntil: 0,
             jetpackUntil: 0,
-            rocketUntil: 0,
             propellerUntil: 0,
             invincibleUntil: 0,
             starUntil: 0,
@@ -2228,6 +2225,7 @@
           this.blackHoleTeleportUntil = 0;
           this.deathAnimUntil = 0;
           this.lastEnemySpawnAltitude = SAFE_ENEMY_START_ALTITUDE - 260;
+          this.lastPowerupSpawnAltitude = -99999;
 
           this.createHUD();
           this.createGameOverOverlay();
@@ -2248,7 +2246,6 @@
           return (
             this.hasSpringInvincibility(time) ||
             time < this.playerState.jetpackUntil ||
-            time < this.playerState.rocketUntil ||
             time < this.playerState.propellerUntil
           );
         }
@@ -3171,6 +3168,19 @@
             }
           }
 
+          // Keep pickups from intersecting any platform so we can sometimes place them "floating"
+          // without clipping into wood. Use a conservative AABB test (platforms are near-rects).
+          const pickupR = PICKUP_RADIUS + 6;
+          for (const platform of this.platforms) {
+            if (!platform || platform.respawnAt > 0) continue;
+            const dy = Math.abs((platform.y || 0) - y);
+            if (dy > (platform.h || PLATFORM_H) / 2 + pickupR) continue;
+            const dx = Math.abs(shortestWrappedDelta(platform.x || 0, x));
+            if (dx <= (platform.w || PLATFORM_W) / 2 + pickupR && dy <= (platform.h || PLATFORM_H) / 2 + pickupR) {
+              return false;
+            }
+          }
+
           return true;
         }
 
@@ -3251,13 +3261,17 @@
               return;
             }
           }
-          if (platform.safe || Math.random() > map(altitude, 0, 7000, 0.08, 0.13)) {
+          if (platform.safe) {
+            return;
+          }
+          const drought = altitude - (this.lastPowerupSpawnAltitude ?? -Infinity);
+          const pity = drought >= POWERUP_PITY_ALTITUDE_GAP;
+          if (!pity && Math.random() > map(altitude, 0, 7000, 0.08, 0.13)) {
             return;
           }
           const powerupWeights = platform.spring
             ? {
                 jetpack: POWERUP_WEIGHTS.jetpack,
-                rocket: POWERUP_WEIGHTS.rocket,
                 propeller: POWERUP_WEIGHTS.propeller,
                 boots: POWERUP_WEIGHTS.boots,
                 star: POWERUP_WEIGHTS.star,
@@ -3294,21 +3308,45 @@
           }
 
           const type = chooseWeighted(filteredWeights);
-          const x = wrapPlayableX(platform.x + Phaser.Math.Between(-28, 28));
-          const yOffset = Phaser.Math.Between(36, 52);
-          const y = platform.y - yOffset;
-          if (!this.canSpawnPickupCandidate(x, y)) {
+
+          // Spawn mode: either sitting over a platform or floating in free space (no platform overlap).
+          // Floating spawns are kept modest so they remain collectable on normal jump arcs.
+          const floating = !pity && Math.random() < 0.42;
+          let spawn = null;
+          for (let attempt = 0; attempt < 9; attempt += 1) {
+            const x = floating
+              ? wrapPlayableX(Phaser.Math.Between(PLAYFIELD_MIN_X + 16, PLAYFIELD_MAX_X - 16))
+              : wrapPlayableX(platform.x + Phaser.Math.Between(-28, 28));
+            const y = (() => {
+              if (!floating) {
+                const yOffset = Phaser.Math.Between(36, 52);
+                return platform.y - yOffset;
+              }
+              // Pick a band that is above the platform but typically not hugging the next platform up.
+              // (We still run platform-intersection checks; this just improves success rate.)
+              const yOffset = Phaser.Math.Between(44, 74);
+              return platform.y - yOffset;
+            })();
+            if (!this.canSpawnPickupCandidate(x, y)) {
+              continue;
+            }
+            spawn = { x, y };
+            break;
+          }
+          if (!spawn) {
             return;
           }
+
           this.pickups.push({
             id: this.idCounter++,
             type,
-            x,
-            y,
-            baseY: y,
+            x: spawn.x,
+            y: spawn.y,
+            baseY: spawn.y,
             bobPhase: Math.random() * Math.PI * 2,
             radius: PICKUP_RADIUS
           });
+          this.lastPowerupSpawnAltitude = altitude;
         }
 
         maybeSpawnEnemy(platform, altitude) {
@@ -3663,10 +3701,7 @@
             move = this.getTiltAxis();
           }
 
-          if (!this.playerState.abducting && time < this.playerState.rocketUntil) {
-            body.velocity.x = 0;
-            body.velocity.y = Math.min(body.velocity.y, ROCKET_VELOCITY);
-          } else if (!this.playerState.abducting) {
+          if (!this.playerState.abducting) {
             body.velocity.x = move * PLAYER_SPEED;
           } else {
             body.velocity.x = 0;
@@ -3991,9 +4026,6 @@
               if (this.powerupCooldownUntil) {
                 this.powerupCooldownUntil.jetpack = Math.max(this.powerupCooldownUntil.jetpack || 0, this.playerState.jetpackUntil + POWERUP_SELF_COOLDOWN_MS);
               }
-            } else if (pickup.type === "rocket") {
-              this.playerState.rocketUntil = time + ROCKET_MS;
-              this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.rocketUntil + POST_POWERUP_INVINCIBILITY_MS);
             } else if (pickup.type === "propeller") {
               this.playerState.propellerUntil = time + PROPELLER_MS;
               this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.propellerUntil + POST_POWERUP_INVINCIBILITY_MS);
@@ -4862,7 +4894,7 @@
           }
 
           // Visual invincibility indicator: only show the rainbow outline for the Star powerup.
-          // Other invincibility sources (jetpack/rocket/propeller/spring) intentionally have no glow.
+          // Other invincibility sources (jetpack/propeller/spring) intentionally have no glow.
           const invincibleFx = time < (this.playerState.starUntil || 0);
           const playerDrawState = {
             x: this.player.x,
@@ -4877,7 +4909,6 @@
             propeller: this.time.now < this.playerState.propellerUntil,
             shield: this.playerState.shield,
             jetpack: this.time.now < this.playerState.jetpackUntil,
-            rocket: this.time.now < this.playerState.rocketUntil,
             vanished: this.playerState.vanished,
             invincibleFx
           };
@@ -5086,33 +5117,6 @@
         // Jetpack is now rendered as a real sprite attachment (see GameScene.renderAll),
         // so keep drawBanditFx focused on non-sprite effects.
 
-        if (state.rocket) {
-          // Old rocket triangle looked like a "warning sign". Replace with a simple capsule + flame.
-          const bodyW = 14 * renderScale;
-          const bodyH = 20 * renderScale;
-          const rocketX = x - 6 * facing;
-          const rocketY = y + 10 * renderScale;
-
-          // Flame (behind)
-          g.fillStyle(COLORS.gold, 0.7);
-          g.fillCircle(rocketX + 10 * facing * renderScale, rocketY + 2 * renderScale, 7 * renderScale);
-          g.fillStyle(COLORS.bandana, 0.35);
-          g.fillCircle(rocketX + 13 * facing * renderScale, rocketY + 4 * renderScale, 5 * renderScale);
-
-          // Capsule body
-          g.fillStyle(COLORS.rust, 1);
-          g.fillRect(rocketX - bodyW / 2, rocketY - bodyH / 2, bodyW, bodyH);
-          g.fillCircle(rocketX, rocketY - bodyH / 2, bodyW / 2);
-          g.fillCircle(rocketX, rocketY + bodyH / 2, bodyW / 2);
-
-          // Stripe
-          g.fillStyle(COLORS.oldBrass, 0.9);
-          g.fillRect(rocketX - bodyW / 2 + 2 * renderScale, rocketY - 2 * renderScale, bodyW - 4 * renderScale, 4 * renderScale);
-
-          g.lineStyle(2, COLORS.ink, 1);
-          g.strokeRect(rocketX - bodyW / 2, rocketY - bodyH / 2, bodyW, bodyH);
-        }
-
         if (state.shooting) {
           drawStar(g, x + facing * 27, y + 8, 2 * renderScale, 7 * renderScale, 4, Math.PI / 4, COLORS.gold, COLORS.gold, 1);
         }
@@ -5206,15 +5210,6 @@
             g.fillStyle(COLORS.poncho, 0.2 + i * 0.08);
             g.fillCircle(sx(-6 + i * 4 - moveLean * 0.3), sy(34 + i * 7), (8 + i * 2) * avgScale);
           }
-        }
-
-        if (state.rocket) {
-          g.fillStyle(COLORS.rust, 1);
-          g.fillTriangle(sx(-10 - hipShift), sy(16), sx(-2 - hipShift), sy(2), sx(6 - hipShift), sy(16));
-          g.lineStyle(2, COLORS.ink, 1);
-          g.strokeTriangle(sx(-10 - hipShift), sy(16), sx(-2 - hipShift), sy(2), sx(6 - hipShift), sy(16));
-          g.fillStyle(COLORS.gold, 0.7);
-          g.fillCircle(sx(-2 - hipShift), sy(22), 6 * avgScale);
         }
 
         const coatTailLeft = [
@@ -5597,23 +5592,6 @@
           g.fillRect(pickup.x - 10, pickup.y - 10, 20, 20);
           g.lineStyle(3, COLORS.ink, 1);
           g.strokeRect(pickup.x - 10, pickup.y - 10, 20, 20);
-        } else if (pickup.type === "rocket") {
-          // Rocket pickup: small capsule + flame (no triangle).
-          g.fillStyle(COLORS.gold, 0.55);
-          g.fillCircle(pickup.x, pickup.y + 12, 10);
-          g.fillStyle(COLORS.bandana, 0.25);
-          g.fillCircle(pickup.x, pickup.y + 16, 7);
-
-          g.fillStyle(COLORS.rust, 1);
-          g.fillRect(pickup.x - 7, pickup.y - 14, 14, 22);
-          g.fillCircle(pickup.x, pickup.y - 14, 7);
-          g.fillCircle(pickup.x, pickup.y + 8, 7);
-
-          g.fillStyle(COLORS.oldBrass, 0.9);
-          g.fillRect(pickup.x - 6, pickup.y - 2, 12, 4);
-
-          g.lineStyle(3, COLORS.ink, 1);
-          g.strokeRect(pickup.x - 7, pickup.y - 14, 14, 22);
         } else if (pickup.type === "propeller") {
           g.fillStyle(COLORS.teal, 1);
           g.fillEllipse(pickup.x, pickup.y + 6, 22, 12);
