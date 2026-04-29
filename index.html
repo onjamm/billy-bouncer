@@ -593,7 +593,7 @@
 
       const POWERUP_WEIGHTS = {
         spring: 14,
-        jetpack: 14,
+        jetpack: 5,
         propeller: 14,
         boots: 14,
         star: 14,
@@ -3759,7 +3759,25 @@
             return;
           }
 
-          const type = chooseWeighted(filteredWeights);
+          // Deduplicate: if a type is already visible within one screen height
+          // don't spawn another one (springs are exempt — seeing two is fine).
+          const SCREEN_H = 800;
+          const onScreenTypes = new Set();
+          for (const p of this.pickups) {
+            if (p.type !== "spring" && Math.abs(p.y - platform.y) < SCREEN_H) {
+              onScreenTypes.add(p.type);
+            }
+          }
+          const dedupedWeights = {};
+          for (const [k, w] of Object.entries(filteredWeights)) {
+            if (k === "spring" || !onScreenTypes.has(k)) {
+              dedupedWeights[k] = w;
+            }
+          }
+          // Fall back to unfiltered pool only if dedup wiped everything out.
+          const spawnWeights = Object.keys(dedupedWeights).length > 0 ? dedupedWeights : filteredWeights;
+
+          const type = chooseWeighted(spawnWeights);
 
           // Spawn mode: either sitting over a platform or floating in free space (no platform overlap).
           // Floating spawns are kept modest so they remain collectable on normal jump arcs.
