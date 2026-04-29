@@ -400,9 +400,14 @@
       // Debug helpers
       const DEBUG_FORCE_EARLY_SHOTGUN = new URLSearchParams(window.location.search).has("debugShotgun");
       const DEBUG_PLATFORM_RESPAWN_ASSERTS = new URLSearchParams(window.location.search).has("debugRespawn");
+      const DEBUG_START_SHIELD = new URLSearchParams(window.location.search).has("debugGlow");
 
       const ENEMY_WEIGHTS_LOW = { snake: 48, vulture: 22, heavy: 18, ufo: 12 };
       const ENEMY_WEIGHTS_HIGH = { snake: 20, vulture: 25, heavy: 26, ufo: 29 };
+
+      // While invincible (jetpack/rocket/propeller/spring), Billy can "body-check" and delete a limited
+      // number of enemies. Keeps invincibility useful without turning it into a full screen clear.
+      const INVINCIBLE_ENEMY_KILLS_PER_WINDOW = 2;
       const GOONER_LINES = [
         "The law caught up eventually...",
         "Billy zigged when he should've zagged.",
@@ -2049,6 +2054,53 @@
             .setOrigin(0.5, BANDIT_SPRITE_ORIGIN_Y)
             .setScale(BANDIT_GAME_SCALE);
 
+          // Invincibility/shield glow: an 8-direction pixel-outline made by rendering tinted
+          // copies of the sprite behind it with 1px offsets (scaled up by the game scale).
+          this.invincibleGlowOffsets = [
+            { x: -1, y: 0 },
+            { x: 1, y: 0 },
+            { x: 0, y: -1 },
+            { x: 0, y: 1 },
+            { x: -1, y: -1 },
+            { x: 1, y: -1 },
+            { x: -1, y: 1 },
+            { x: 1, y: 1 }
+          ];
+          // Dark underlay ring to keep the rainbow readable on bright backgrounds.
+          // (Think "stroke" behind the colored glow.)
+          this.invincibleGlowUnderlaySprites = this.invincibleGlowOffsets.map(() => {
+            const under = this.add.sprite(GAME_W / 2, START_Y, "bandit-idle-south", 0)
+              .setDepth(12)
+              .setOrigin(0.5, BANDIT_SPRITE_ORIGIN_Y)
+              .setScale(BANDIT_GAME_SCALE)
+              .setAlpha(0)
+              .setBlendMode(Phaser.BlendModes.NORMAL)
+              .setVisible(false);
+            const ink = COLORS?.ink ?? 0x0b0b0b;
+            if (under.setTintFill) {
+              under.setTintFill(ink);
+            } else {
+              under.setTint(ink);
+            }
+            return under;
+          });
+          this.invincibleGlowSprites = this.invincibleGlowOffsets.map(() => {
+            const glow = this.add.sprite(GAME_W / 2, START_Y, "bandit-idle-south", 0)
+              .setDepth(13)
+              .setOrigin(0.5, BANDIT_SPRITE_ORIGIN_Y)
+              .setScale(BANDIT_GAME_SCALE)
+              .setAlpha(0)
+              // NORMAL blend so the rainbow stays visible even on bright/white backgrounds.
+              .setBlendMode(Phaser.BlendModes.NORMAL)
+              .setVisible(false);
+            if (glow.setTintFill) {
+              glow.setTintFill(0xffffff);
+            } else {
+              glow.setTint(0xffffff);
+            }
+            return glow;
+          });
+
           // Jetpack attachment sprite (PixelLab). Side-view only; flame anim plays while active.
           this.jetpackSprite = this.add.sprite(GAME_W / 2, START_Y, JETPACK_SHEET_KEY, 0)
             .setDepth(15)
@@ -2127,11 +2179,16 @@
             springBoostActive: false,
             shield: false,
             springBoots: 0,
+            invincibleKillsLeft: 0,
+            invincibleKillsActive: false,
             shotgunAmmo: 0,
             vanished: false,
             abducting: false,
             abductionEnemy: null
           };
+          if (DEBUG_START_SHIELD) {
+            this.playerState.shield = true;
+          }
 
           this.highestY = this.player.y;
           this.bestScore = Number(localStorage.getItem(BEST_SCORE_KEY) || 0);
@@ -2178,8 +2235,7 @@
             this.hasSpringInvincibility(time) ||
             time < this.playerState.jetpackUntil ||
             time < this.playerState.rocketUntil ||
-            time < this.playerState.propellerUntil ||
-            this.playerState.springBoots > 0
+            time < this.playerState.propellerUntil
           );
         }
 
@@ -4006,6 +4062,15 @@
           }
 
           const invincible = this.hasPowerupInvincibility();
+          if (invincible) {
+            if (!this.playerState.invincibleKillsActive) {
+              this.playerState.invincibleKillsActive = true;
+              this.playerState.invincibleKillsLeft = INVINCIBLE_ENEMY_KILLS_PER_WINDOW;
+            }
+          } else if (this.playerState.invincibleKillsActive) {
+            this.playerState.invincibleKillsActive = false;
+            this.playerState.invincibleKillsLeft = 0;
+          }
 
           const propellerActive = this.time.now < this.playerState.propellerUntil;
 
@@ -4048,7 +4113,13 @@
             }
 
             // Invincibility prevents the player from taking damage, but should not prevent stomps.
+            // New: allow a limited number of "body-check" kills per invincibility window.
             if (invincible) {
+              if (this.playerState.invincibleKillsLeft > 0) {
+                this.playerState.invincibleKillsLeft -= 1;
+                this.damageEnemy(enemy, enemy.hp);
+                this.spawnBurst(enemy.x, enemy.y, COLORS.white, 3);
+              }
               continue;
             }
 
@@ -4690,6 +4761,7 @@
             }
           }
 
+          const invincibleFx = this.hasPowerupInvincibility(time) || this.playerState.shield;
           const playerDrawState = {
             x: this.player.x,
             y: this.player.y,
@@ -4704,7 +4776,8 @@
             shield: this.playerState.shield,
             jetpack: this.time.now < this.playerState.jetpackUntil,
             rocket: this.time.now < this.playerState.rocketUntil,
-            vanished: this.playerState.vanished
+            vanished: this.playerState.vanished,
+            invincibleFx
           };
           if (playerDrawState.vanished) {
             if (this.playerSprite) this.playerSprite.setVisible(false);
@@ -4712,6 +4785,62 @@
             syncBanditSprite(this.playerSprite, playerDrawState, time, BANDIT_GAME_SCALE, BANDIT_GAME_Y_OFFSET);
           }
           const spriteBounds = this.playerSprite && this.playerSprite.getBounds ? this.playerSprite.getBounds() : null;
+
+          // Glow outline: tight "pixel border" (no bubble). Uses 8 tinted sprite copies behind Billy.
+          if (this.invincibleGlowSprites && this.invincibleGlowOffsets) {
+            const glowActive = !playerDrawState.vanished && playerDrawState.invincibleFx;
+            if (!glowActive) {
+              if (this.invincibleGlowUnderlaySprites) {
+                this.invincibleGlowUnderlaySprites.forEach((s) => s && s.setVisible(false));
+              }
+              this.invincibleGlowSprites.forEach((s) => s && s.setVisible(false));
+            } else {
+              // "Rainbowy" outline: hue cycles over time and across the 8 offsets.
+              const pulse = 0.62 + (0.5 + Math.sin(time * 0.014) * 0.5) * 0.38;
+              // Higher alpha because we're not using ADD blending anymore (keeps it readable on parchment).
+              const alpha = 0.45 + 0.25 * pulse;
+              // One source pixel is ~2.55 screen pixels at our base scale; keep it close to the silhouette.
+              const avgScale = (playerDrawState.scaleX + playerDrawState.scaleY) * 0.5;
+              const offset = Math.max(2, Math.round(2.35 * avgScale));
+              const underOffset = offset + 1;
+              const hueBase = ((time * 0.00035) % 1 + 1) % 1;
+              const glowState = { ...playerDrawState, flash: false };
+
+              // Underlay stroke first (darker, slightly wider) so the rainbow has contrast on bright BGs.
+              if (this.invincibleGlowUnderlaySprites) {
+                const underAlpha = 0.38 + 0.14 * pulse;
+                for (let i = 0; i < this.invincibleGlowUnderlaySprites.length; i += 1) {
+                  const under = this.invincibleGlowUnderlaySprites[i];
+                  const d = this.invincibleGlowOffsets[i];
+                  if (!under || !d) continue;
+                  syncBanditSprite(under, glowState, time, BANDIT_GAME_SCALE, BANDIT_GAME_Y_OFFSET);
+                  under.setPosition(under.x + d.x * underOffset, under.y + d.y * underOffset);
+                  under.setAlpha(i < 4 ? underAlpha : underAlpha * 0.88);
+                  under.setVisible(true);
+                }
+              }
+
+              for (let i = 0; i < this.invincibleGlowSprites.length; i += 1) {
+                const glow = this.invincibleGlowSprites[i];
+                const d = this.invincibleGlowOffsets[i];
+                if (!glow || !d) continue;
+                const hue = (hueBase + i / this.invincibleGlowSprites.length) % 1;
+                // Slightly darker + more saturated so the rainbow reads on white backgrounds too.
+                const rgb = Phaser.Display.Color.HSVToRGB(hue, 0.92, 0.9);
+                const tint = Phaser.Display.Color.GetColor(rgb.r, rgb.g, rgb.b);
+                if (glow.setTintFill) {
+                  glow.setTintFill(tint);
+                } else {
+                  glow.setTint(tint);
+                }
+                syncBanditSprite(glow, glowState, time, BANDIT_GAME_SCALE, BANDIT_GAME_Y_OFFSET);
+                glow.setPosition(glow.x + d.x * offset, glow.y + d.y * offset);
+                // Slightly vary alpha so diagonals don't overpower the ring.
+                glow.setAlpha(i < 4 ? alpha : alpha * 0.86);
+                glow.setVisible(true);
+              }
+            }
+          }
           // Jetpack attachment: snap to Billy's back at a believable height.
           if (this.jetpackSprite) {
             if (!playerDrawState.vanished && playerDrawState.jetpack) {
@@ -4852,23 +4981,6 @@
         const renderScale = BANDIT_GAME_SCALE * avgScale;
         const facing = state.dir < 0 ? -1 : 1;
 
-        if (state.shield) {
-          const pulse = 1 + Math.sin(time * 0.008) * 0.035;
-          const sb = spriteBounds;
-          const baseW = sb ? sb.width + 22 : 78 * renderScale;
-          const baseH = sb ? sb.height + 26 : 96 * renderScale;
-          const shellW = baseW * pulse;
-          const shellH = baseH * (1 - Math.sin(time * 0.008) * 0.02);
-          const shellY = sb ? sb.top + sb.height * 0.52 : y - 2 * renderScale;
-          g.fillStyle(0x64A0DC, 0.12);
-          g.fillEllipse(x, shellY, shellW, shellH);
-          g.lineStyle(3, 0xFFFFFF, 0.34);
-          g.strokeEllipse(x, shellY, shellW, shellH);
-          g.lineStyle(2, 0x64A0DC, 0.65);
-          const inset = sb ? 6 : 6 * renderScale;
-          g.strokeEllipse(x, shellY, shellW - inset, shellH - inset * 1.35);
-        }
-
         // Jetpack is now rendered as a real sprite attachment (see GameScene.renderAll),
         // so keep drawBanditFx focused on non-sprite effects.
 
@@ -4968,33 +5080,6 @@
         const strokePoly = (points, fillColor, alpha = 1, width = OUTLINE_W - 1) => {
           fillStrokePolygon(g, points, fillColor, alpha, COLORS.ink, width);
         };
-
-        if (state.shield) {
-          const pulse = 1 + Math.sin(time * 0.008) * 0.035;
-          const shellW = 78 * avgScale * pulse;
-          const shellH = 96 * avgScale * (1 - Math.sin(time * 0.008) * 0.02);
-          const shellY = y - 2 * avgScale;
-          g.fillStyle(0x64A0DC, 0.12);
-          g.fillEllipse(x, shellY, shellW, shellH);
-          g.lineStyle(3, 0xFFFFFF, 0.34);
-          g.strokeEllipse(x, shellY, shellW, shellH);
-          g.lineStyle(2, 0x64A0DC, 0.65);
-          g.strokeEllipse(x, shellY, shellW - 6 * avgScale, shellH - 8 * avgScale);
-
-          const glintOffset = Math.sin(time * 0.01) * 2;
-          g.lineStyle(3, 0xFFFFFF, 0.42);
-          g.beginPath();
-          g.moveTo(x - 25 * avgScale, shellY - 34 * avgScale + glintOffset);
-          g.lineTo(x - 12 * avgScale, shellY - 45 * avgScale + glintOffset);
-          g.lineTo(x + 3 * avgScale, shellY - 38 * avgScale + glintOffset);
-          g.strokePath();
-
-          g.lineStyle(2, 0xFFFFFF, 0.24);
-          g.beginPath();
-          g.moveTo(x + 18 * avgScale, shellY + 26 * avgScale);
-          g.lineTo(x + 29 * avgScale, shellY + 16 * avgScale);
-          g.strokePath();
-        }
 
         if (state.jetpack) {
           for (let i = 0; i < 4; i += 1) {
