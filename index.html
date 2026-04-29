@@ -249,6 +249,102 @@
     }
     .menu-settings-confirm-yes:active { background: rgba(255, 238, 230, 1); }
     .menu-settings-confirm-no:active  { background: rgba(230, 214, 172, 1); }
+
+    /* ── Trophy / medals panel ──────────────────────────────────── */
+    .menu-trophy-panel {
+      position: fixed;
+      z-index: 140;
+      display: none;
+      box-sizing: border-box;
+      border: 3px solid #1C1208;
+      background: rgba(244, 228, 188, 0.96);
+      border-radius: 12px;
+      box-shadow: 4px 4px 0 rgba(184, 48, 32, 0.25);
+      padding: 10px 12px 12px;
+      pointer-events: auto;
+      backdrop-filter: blur(1px);
+    }
+    .menu-trophy-panel::before {
+      content: "";
+      position: absolute;
+      top: -8px;
+      left: 18px;
+      width: 14px;
+      height: 14px;
+      background: rgba(244, 228, 188, 0.96);
+      transform: rotate(45deg);
+      border-left: 3px solid #1C1208;
+      border-top: 3px solid #1C1208;
+    }
+    .menu-trophy-panel-title {
+      font-family: Georgia, serif;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1.1px;
+      color: rgba(28, 18, 8, 0.55);
+      text-align: center;
+      margin-bottom: 9px;
+      text-transform: uppercase;
+    }
+    .menu-trophy-grid {
+      display: flex;
+      justify-content: space-between;
+      gap: 5px;
+    }
+    .menu-trophy-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+    }
+    .menu-trophy-medal {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Georgia, serif;
+      font-size: 18px;
+      font-weight: bold;
+      box-sizing: border-box;
+      transition: transform 0.12s ease;
+    }
+    .menu-trophy-medal.earned {
+      box-shadow: inset 0 -3px 6px rgba(0,0,0,0.22), 0 2px 5px rgba(0,0,0,0.28);
+      color: rgba(255, 252, 235, 0.95);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.55);
+    }
+    .menu-trophy-medal.earned:hover { transform: scale(1.09); cursor: default; }
+    .menu-trophy-medal.bronze  { background: radial-gradient(circle at 36% 36%, #E8A850 0%, #A07820 55%, #603810 100%); }
+    .menu-trophy-medal.silver  { background: radial-gradient(circle at 36% 36%, #ECECEC 0%, #A8A8A8 55%, #505050 100%); }
+    .menu-trophy-medal.gold    { background: radial-gradient(circle at 36% 36%, #FFE860 0%, #D4A800 55%, #967000 100%); }
+    .menu-trophy-medal.platinum{ background: radial-gradient(circle at 36% 36%, #D8EEF8 0%, #8AAEC4 55%, #405868 100%); }
+    .menu-trophy-medal.locked {
+      background: rgba(220, 205, 170, 0.42);
+      border: 2.5px dashed rgba(28, 18, 8, 0.26);
+      color: rgba(28, 18, 8, 0.20);
+      font-size: 15px;
+      font-style: italic;
+      box-shadow: none;
+    }
+    .menu-trophy-slot-label {
+      font-family: Georgia, serif;
+      font-size: 8px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-align: center;
+      text-transform: uppercase;
+      color: rgba(28, 18, 8, 0.38);
+    }
+    .menu-trophy-slot-label.earned { color: rgba(28, 18, 8, 0.80); }
+    .menu-trophy-slot-sub {
+      font-family: Georgia, serif;
+      font-size: 7px;
+      color: rgba(28, 18, 8, 0.32);
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -1525,6 +1621,60 @@
         g.strokeCircle(x, y, 3.6 * s);
       }
 
+      // ── Trophy icon for menu button ─────────────────────────────
+      function drawMenuTrophyIcon(g, x, y, s) {
+        g.clear();
+        const ink = COLORS.ink;
+        const parchment = COLORS.parchment;
+
+        // Filled shapes
+        g.fillStyle(ink, 0.92);
+
+        // Base platform
+        g.fillRect(x - 5.8 * s, y + 6.0 * s, 11.6 * s, 2.4 * s);
+
+        // Stem
+        g.fillRect(x - 2.0 * s, y + 2.4 * s, 4.0 * s, 3.6 * s);
+
+        // Cup body (trapezoid: wider at top)
+        const cupTopY = y - 6.0 * s;
+        const cupBotY = y + 2.4 * s;
+        const cupTopHW = 5.2 * s;
+        const cupBotHW = 2.6 * s;
+        g.fillPoints([
+          { x: x - cupTopHW, y: cupTopY },
+          { x: x + cupTopHW, y: cupTopY },
+          { x: x + cupBotHW, y: cupBotY },
+          { x: x - cupBotHW, y: cupBotY },
+        ], true);
+
+        // Handles (stroke arcs, line caps round)
+        const handleMidY = y - 2.4 * s;
+        const handleR   = 2.5 * s;
+        g.lineStyle(2.0 * s, ink, 0.92);
+
+        // Left handle curves to the left (counterclockwise in canvas from 270° to 90°)
+        g.beginPath();
+        g.arc(x - cupTopHW + 0.5 * s, handleMidY, handleR,
+          Phaser.Math.DegToRad(270), Phaser.Math.DegToRad(90), true);
+        g.strokePath();
+
+        // Right handle curves to the right (clockwise)
+        g.beginPath();
+        g.arc(x + cupTopHW - 0.5 * s, handleMidY, handleR,
+          Phaser.Math.DegToRad(270), Phaser.Math.DegToRad(90), false);
+        g.strokePath();
+
+        // Subtle shine on cup face
+        g.fillStyle(parchment, 0.17);
+        g.fillPoints([
+          { x: x - 2.5 * s, y: cupTopY + 1.0 * s },
+          { x: x - 0.5 * s, y: cupTopY + 1.0 * s },
+          { x: x - 1.2 * s, y: cupBotY - 0.6 * s },
+          { x: x - 3.0 * s, y: cupBotY - 0.6 * s },
+        ], true);
+      }
+
       // ============================================================
       // Menu scene
       // ============================================================
@@ -1587,6 +1737,15 @@
           const volumePanelH = 132;
           const volumePanelX = volumeButtonX - volumeButtonW / 2 + volumePanelW / 2;
           const volumePanelY = volumeButtonY + volumeButtonH / 2 + volumePanelH / 2 + 4;
+
+          const trophyButtonW = volumeButtonW;
+          const trophyButtonH = volumeButtonH;
+          const trophyButtonX = volumeButtonX + volumeButtonW / 2 + 4 + trophyButtonW / 2;
+          const trophyButtonY = volumeButtonY;
+          const trophyPanelW  = volumePanelW;
+          const trophyPanelH  = 138;
+          const trophyPanelX  = trophyButtonX - trophyButtonW / 2 + trophyPanelW / 2;
+          const trophyPanelY  = trophyButtonY + trophyButtonH / 2 + trophyPanelH / 2 + 4;
 
           this.titleShadow = this.add.text(centerX + 4, 132 + 4, "BILLY BOUNCER", {
             fontFamily: "Georgia, serif",
@@ -1655,6 +1814,13 @@
           drawMenuGearIcon(this.volumeButtonIcon, volumeButtonX, volumeButtonY, volumeIconScale);
           this.updateMenuVolumeIcon = () => { /* gear icon is static */ };
 
+          // Trophy button (right of settings)
+          this.trophyButtonBox = this.add.rectangle(trophyButtonX, trophyButtonY, trophyButtonW, trophyButtonH, COLORS.parchment, 0.96)
+            .setStrokeStyle(3, COLORS.ink, 0.72);
+          this.trophyButtonIcon = this.add.graphics();
+          const trophyIconScale = mobileBoard ? 0.88 : 0.94;
+          drawMenuTrophyIcon(this.trophyButtonIcon, trophyButtonX, trophyButtonY, trophyIconScale);
+
           this.boardPanel = this.add.rectangle(boardPanelX, boardPanelY, boardPanelW, boardPanelH, COLORS.parchment, 0.97)
             .setStrokeStyle(3, COLORS.ink, 0.5)
             .setVisible(false);
@@ -1686,6 +1852,9 @@
           this.volumeButtonBounds = { x: volumeButtonX, y: volumeButtonY, w: volumeButtonW, h: volumeButtonH };
           this.volumePanelBounds = { x: volumePanelX, y: volumePanelY, w: volumePanelW, h: volumePanelH };
           this.volumeOpen = false;
+          this.trophyButtonBounds = { x: trophyButtonX, y: trophyButtonY, w: trophyButtonW, h: trophyButtonH };
+          this.trophyPanelBounds  = { x: trophyPanelX,  y: trophyPanelY,  w: trophyPanelW,  h: trophyPanelH };
+          this.trophyOpen = false;
 
           this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
           this.menuRequiresExplicitTilt = showTiltButton;
@@ -1697,6 +1866,10 @@
               this.setVolumeOpen(false);
               return;
             }
+            if (this.trophyOpen) {
+              this.setTrophyOpen(false);
+              return;
+            }
             if (!this.menuRequiresExplicitTilt) {
               void this.startGame();
             }
@@ -1705,7 +1878,7 @@
           this.onMenuStartKey = () => {
             if (this.starting) return;
             if (this.menuRequiresExplicitTilt) return;
-            if (this.boardOpen || this.volumeOpen) return;
+            if (this.boardOpen || this.volumeOpen || this.trophyOpen) return;
             if (typeof document !== "undefined" && document.activeElement) {
               const tag = String(document.activeElement.tagName || "").toUpperCase();
               if (tag === "INPUT" || tag === "BUTTON" || tag === "TEXTAREA" || tag === "SELECT") {
@@ -1766,6 +1939,7 @@
           this.domMenuBoardBtn = makeBtn("Toggle leaderboard");
           this.domMenuBoardCloseBtn = makeBtn("Close leaderboard");
           this.domMenuVolumeBtn = makeBtn("Open settings");
+          this.domMenuTrophyBtn = makeBtn("View medals");
 
           // ── Settings panel ─────────────────────────────────────────────
           this.domMenuVolumePanel = document.createElement("div");
@@ -1883,7 +2057,62 @@
               this.medalTrack.setText(getMedalProgressText(0));
               this.medalTrack.setColor(Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(0)).rgba);
             }
+            if (this.refreshTrophyPanel) this.refreshTrophyPanel();
           });
+
+          // ── Trophy panel ───────────────────────────────────────────
+          this.domMenuTrophyPanel = document.createElement("div");
+          this.domMenuTrophyPanel.className = "menu-trophy-panel";
+          this.domMenuTrophyPanel.setAttribute("role", "dialog");
+          this.domMenuTrophyPanel.setAttribute("aria-label", "Medal case");
+          this.domMenuTrophyPanel.style.display = "none";
+
+          const trophyPanelTitle = document.createElement("div");
+          trophyPanelTitle.className = "menu-trophy-panel-title";
+          trophyPanelTitle.textContent = "MEDALS EARNED";
+
+          const trophyGrid = document.createElement("div");
+          trophyGrid.className = "menu-trophy-grid";
+
+          // Store medal elements for refresh
+          const medalEls = [];
+          const TROPHY_TIERS = MEDAL_TIERS; // [bronze,silver,gold,platinum]
+          TROPHY_TIERS.forEach((tier) => {
+            const slot = document.createElement("div");
+            slot.className = "menu-trophy-slot";
+
+            const medal = document.createElement("div");
+            medal.className = "menu-trophy-medal locked";
+            medal.textContent = "?";
+
+            const label = document.createElement("div");
+            label.className = "menu-trophy-slot-label";
+            label.textContent = tier.label;
+
+            const sub = document.createElement("div");
+            sub.className = "menu-trophy-slot-sub";
+            sub.textContent = (tier.threshold >= 1000 ? (tier.threshold / 1000) + "K" : tier.threshold) + " FT";
+
+            slot.append(medal, label, sub);
+            trophyGrid.appendChild(slot);
+            medalEls.push({ medal, label });
+          });
+
+          this.domMenuTrophyPanel.append(trophyPanelTitle, trophyGrid);
+          document.body.appendChild(this.domMenuTrophyPanel);
+
+          // Refresh medal states from localStorage
+          this.refreshTrophyPanel = () => {
+            const best = Number(localStorage.getItem(BEST_SCORE_KEY) || 0);
+            TROPHY_TIERS.forEach((tier, i) => {
+              const { medal, label } = medalEls[i];
+              const earned = best >= tier.threshold;
+              medal.className = "menu-trophy-medal " + (earned ? "earned " + tier.key : "locked");
+              medal.textContent = earned ? "★" : "?";
+              label.className = "menu-trophy-slot-label" + (earned ? " earned" : "");
+            });
+          };
+          this.refreshTrophyPanel();
 
           const start = (e) => {
             if (e && e.preventDefault) e.preventDefault();
@@ -1909,11 +2138,19 @@
           const handleSettingsPress = (e) => {
             if (e && e.preventDefault) e.preventDefault();
             const opening = !this.volumeOpen;
+            if (opening && this.trophyOpen) this.setTrophyOpen(false);
             this.setVolumeOpen(opening);
             if (opening && this.domMenuVolumeRange) {
               this.domMenuVolumeRange.value = String(Math.round((this.audio ? this.audio.getVolume() : DEFAULT_VOLUME) * 100));
               this.domMenuVolumeRange.focus();
             }
+          };
+          const handleTrophyPress = (e) => {
+            if (e && e.preventDefault) e.preventDefault();
+            const opening = !this.trophyOpen;
+            if (opening && this.volumeOpen) this.setVolumeOpen(false);
+            if (opening && this.refreshTrophyPanel) this.refreshTrophyPanel();
+            this.setTrophyOpen(opening);
           };
 
           this.domMenuStartBtn.addEventListener("click", start);
@@ -1924,6 +2161,8 @@
           this.domMenuBoardCloseBtn.addEventListener("touchend", closeBoard, { passive: false });
           this.domMenuVolumeBtn.addEventListener("click", handleSettingsPress);
           this.domMenuVolumeBtn.addEventListener("touchend", handleSettingsPress, { passive: false });
+          this.domMenuTrophyBtn.addEventListener("click", handleTrophyPress);
+          this.domMenuTrophyBtn.addEventListener("touchend", handleTrophyPress, { passive: false });
 
           // Keep buttons lined up with the canvas even after mobile viewport changes.
           this.positionMenuDOMButtons = () => this.positionMenuDOMButtonsImpl();
@@ -1935,6 +2174,16 @@
           this.volumeOpen = !!open;
           if (this.domMenuVolumePanel) {
             this.domMenuVolumePanel.style.display = this.volumeOpen ? "block" : "none";
+          }
+          if (this.positionMenuDOMButtons) {
+            this.positionMenuDOMButtons();
+          }
+        }
+
+        setTrophyOpen(open) {
+          this.trophyOpen = !!open;
+          if (this.domMenuTrophyPanel) {
+            this.domMenuTrophyPanel.style.display = this.trophyOpen ? "block" : "none";
           }
           if (this.positionMenuDOMButtons) {
             this.positionMenuDOMButtons();
@@ -1974,6 +2223,16 @@
               place(this.domMenuVolumePanel, this.volumePanelBounds);
             } else {
               this.domMenuVolumePanel.style.display = "none";
+            }
+          }
+          if (this.domMenuTrophyBtn && this.trophyButtonBounds) {
+            place(this.domMenuTrophyBtn, this.trophyButtonBounds);
+          }
+          if (this.domMenuTrophyPanel && this.trophyPanelBounds) {
+            if (this.trophyOpen) {
+              place(this.domMenuTrophyPanel, this.trophyPanelBounds);
+            } else {
+              this.domMenuTrophyPanel.style.display = "none";
             }
           }
 
@@ -2044,6 +2303,9 @@
           if (this.domMenuVolumeBtn) { this.domMenuVolumeBtn.remove(); this.domMenuVolumeBtn = null; }
           if (this.domMenuVolumePanel) { this.domMenuVolumePanel.remove(); this.domMenuVolumePanel = null; }
           this.domMenuVolumeRange = null;
+          if (this.domMenuTrophyBtn) { this.domMenuTrophyBtn.remove(); this.domMenuTrophyBtn = null; }
+          if (this.domMenuTrophyPanel) { this.domMenuTrophyPanel.remove(); this.domMenuTrophyPanel = null; }
+          this.refreshTrophyPanel = null;
           if (this.menuVolumeTapTimer) {
             clearTimeout(this.menuVolumeTapTimer);
             this.menuVolumeTapTimer = null;
@@ -2071,6 +2333,8 @@
             this.boardButtonText,
             this.volumeButtonBox,
             this.volumeButtonIcon,
+            this.trophyButtonBox,
+            this.trophyButtonIcon,
             this.boardPanel,
             this.boardPanelTitle,
             this.boardCloseText,
