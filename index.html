@@ -185,7 +185,7 @@
       const JUMP_VELOCITY = -680;
       const PLATFORM_SPRING_VELOCITY = -1300;
       const PICKUP_SPRING_VELOCITY = -1600;
-      const ROCKET_VELOCITY = -2200;
+      const ROCKET_VELOCITY = -2600;
       const JETPACK_VELOCITY = -980;
       const PROPELLER_LIFT_VELOCITY = -430;
       const BOOTS_VELOCITY = -1360;
@@ -5076,12 +5076,30 @@
         // so keep drawBanditFx focused on non-sprite effects.
 
         if (state.rocket) {
-          g.fillStyle(COLORS.gold, 0.78);
-          g.fillCircle(x - 4 * facing, y + 22, 8 * renderScale);
+          // Old rocket triangle looked like a "warning sign". Replace with a simple capsule + flame.
+          const bodyW = 14 * renderScale;
+          const bodyH = 20 * renderScale;
+          const rocketX = x - 6 * facing;
+          const rocketY = y + 10 * renderScale;
+
+          // Flame (behind)
+          g.fillStyle(COLORS.gold, 0.7);
+          g.fillCircle(rocketX + 10 * facing * renderScale, rocketY + 2 * renderScale, 7 * renderScale);
+          g.fillStyle(COLORS.bandana, 0.35);
+          g.fillCircle(rocketX + 13 * facing * renderScale, rocketY + 4 * renderScale, 5 * renderScale);
+
+          // Capsule body
           g.fillStyle(COLORS.rust, 1);
-          g.fillTriangle(x - 12 * facing, y + 16, x - 4 * facing, y, x + 4 * facing, y + 16);
+          g.fillRect(rocketX - bodyW / 2, rocketY - bodyH / 2, bodyW, bodyH);
+          g.fillCircle(rocketX, rocketY - bodyH / 2, bodyW / 2);
+          g.fillCircle(rocketX, rocketY + bodyH / 2, bodyW / 2);
+
+          // Stripe
+          g.fillStyle(COLORS.oldBrass, 0.9);
+          g.fillRect(rocketX - bodyW / 2 + 2 * renderScale, rocketY - 2 * renderScale, bodyW - 4 * renderScale, 4 * renderScale);
+
           g.lineStyle(2, COLORS.ink, 1);
-          g.strokeTriangle(x - 12 * facing, y + 16, x - 4 * facing, y, x + 4 * facing, y + 16);
+          g.strokeRect(rocketX - bodyW / 2, rocketY - bodyH / 2, bodyW, bodyH);
         }
 
         if (state.shooting) {
@@ -5114,7 +5132,7 @@
         const hatOffsetY = (rising ? -2 : falling ? 2 : 0) * renderScale;
         const moveIntent = clamp((state.vx || 0) / PLAYER_SPEED, -1, 1);
         const hatShift = moveIntent * 6 * 0.7;
-        const rotorAngle = time * 0.04;
+        const rotorAngle = time * 0.07;
         const rotorDx = Math.cos(rotorAngle) * 14 * hatScale;
         const rotorDy = Math.sin(rotorAngle) * 3 * hatScale;
 
@@ -5569,10 +5587,22 @@
           g.lineStyle(3, COLORS.ink, 1);
           g.strokeRect(pickup.x - 10, pickup.y - 10, 20, 20);
         } else if (pickup.type === "rocket") {
+          // Rocket pickup: small capsule + flame (no triangle).
+          g.fillStyle(COLORS.gold, 0.55);
+          g.fillCircle(pickup.x, pickup.y + 12, 10);
+          g.fillStyle(COLORS.bandana, 0.25);
+          g.fillCircle(pickup.x, pickup.y + 16, 7);
+
           g.fillStyle(COLORS.rust, 1);
-          g.fillTriangle(pickup.x, pickup.y - 14, pickup.x - 12, pickup.y + 12, pickup.x + 12, pickup.y + 12);
+          g.fillRect(pickup.x - 7, pickup.y - 14, 14, 22);
+          g.fillCircle(pickup.x, pickup.y - 14, 7);
+          g.fillCircle(pickup.x, pickup.y + 8, 7);
+
+          g.fillStyle(COLORS.oldBrass, 0.9);
+          g.fillRect(pickup.x - 6, pickup.y - 2, 12, 4);
+
           g.lineStyle(3, COLORS.ink, 1);
-          g.strokeTriangle(pickup.x, pickup.y - 14, pickup.x - 12, pickup.y + 12, pickup.x + 12, pickup.y + 12);
+          g.strokeRect(pickup.x - 7, pickup.y - 14, 14, 22);
         } else if (pickup.type === "propeller") {
           g.fillStyle(COLORS.teal, 1);
           g.fillEllipse(pickup.x, pickup.y + 6, 22, 12);
