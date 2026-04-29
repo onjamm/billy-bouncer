@@ -230,6 +230,7 @@
       const LEADERBOARD_HANDLE_KEY = "billy_bouncer_handle";
       const LEADERBOARD_LAST_SUBMITTED_KEY = "billy_bouncer_last_submitted";
       const VOLUME_KEY = "billy_bouncer_volume";
+      const GAME_OVER_TITLE_SEEN_KEY = "billy_bouncer_game_over_title_seen_v1";
       const DEFAULT_VOLUME = 0.82; // slightly louder by default
       const VOLUME_MAX_GAIN = 0.5; // more headroom at 100%
       const VOLUME_CURVE = 1.4; // still perceptual, but not as aggressive (less "too quiet")
@@ -2501,20 +2502,34 @@
           this.overlay.setAlpha(0);
           this.overlay.setVisible(false);
 
+          const chooseGameOverTitle = () => {
+            try {
+              const seen = localStorage.getItem(GAME_OVER_TITLE_SEEN_KEY) === "1";
+              if (!seen) {
+                localStorage.setItem(GAME_OVER_TITLE_SEEN_KEY, "1");
+                return "GONER!";
+              }
+            } catch (error) {}
+            return Math.random() < 0.5 ? "GONER!" : "GOONER!";
+          };
+          this.gameOverTitleText = chooseGameOverTitle();
+
           const dim = this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, 0xF4E4BC, 0.93);
           const panelTint = this.add.rectangle(cx, GAME_OVER_PANEL_Y, GAME_OVER_PANEL_W - 12, GAME_OVER_PANEL_H - 20, 0xFFFFFF, 0.14);
-          const gonerShadow = this.add.text(cx + 3, GAME_OVER_TITLE_Y + 3, "GOONER!", {
+          const gonerShadow = this.add.text(cx + 3, GAME_OVER_TITLE_Y + 3, this.gameOverTitleText, {
             fontFamily: "Georgia, serif",
             fontSize: "64px",
             fontStyle: "bold",
             color: CSS.bandana
           }).setOrigin(0.5);
-          const goner = this.add.text(cx, GAME_OVER_TITLE_Y, "GOONER!", {
+          const goner = this.add.text(cx, GAME_OVER_TITLE_Y, this.gameOverTitleText, {
             fontFamily: "Georgia, serif",
             fontSize: "64px",
             fontStyle: "bold",
             color: CSS.ink
           }).setOrigin(0.5);
+          this.gameOverTitle = goner;
+          this.gameOverTitleShadow = gonerShadow;
           this.gameOverLine = this.add.text(cx, GAME_OVER_LINE_Y, GOONER_LINES[0], {
             fontFamily: "Georgia, serif",
             fontSize: "24px",
@@ -4638,6 +4653,22 @@
           // Everything that used to happen in triggerGameOver() after the immediate stop.
           this.audio.stopAll();
           this.audio.gameOver();
+
+          // Title: first ever death shows "GONER!", subsequent deaths randomize between GONER/GOONER.
+          const title = (() => {
+            try {
+              const seen = localStorage.getItem(GAME_OVER_TITLE_SEEN_KEY) === "1";
+              if (!seen) {
+                localStorage.setItem(GAME_OVER_TITLE_SEEN_KEY, "1");
+                return "GONER!";
+              }
+            } catch (error) {}
+            return Math.random() < 0.5 ? "GONER!" : "GOONER!";
+          })();
+          this.gameOverTitleText = title;
+          if (this.gameOverTitle) this.gameOverTitle.setText(title);
+          if (this.gameOverTitleShadow) this.gameOverTitleShadow.setText(title);
+
           this.gameOverLine.setText(this.getRandomGameOverLine());
           this.finalScore.setText(`${formatPoints(this.score)} FT`);
           this.medalText.setText(getMedalProgressText(this.score));
