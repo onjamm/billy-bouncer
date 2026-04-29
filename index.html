@@ -4348,7 +4348,9 @@
 
           const gunX = this.player.x + 14 * this.playerState.dir;
           const gunY = this.player.y + 4;
-          if (IS_MOBILE && targetY >= gunY) {
+          // Shots should never go downward; if the player aims below the gun,
+          // mirror the aim point upward across the gun's horizontal line.
+          if (targetY >= gunY) {
             targetY = gunY - (targetY - gunY);
           }
           const dx = targetX - gunX;
@@ -4373,11 +4375,12 @@
             const angles = [baseAngle - spread, baseAngle, baseAngle + spread];
             for (const angle of angles) {
               const speed = PELLET_SPEED * (0.94 + Math.random() * 0.08);
+              const finalAngle = angle > 0 ? -angle : angle;
               this.pellets.push({
                 x: gunX,
                 y: gunY,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
+                vx: Math.cos(finalAngle) * speed,
+                vy: Math.sin(finalAngle) * speed,
                 w: 10,
                 h: 6,
                 trail: []
