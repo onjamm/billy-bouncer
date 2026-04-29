@@ -496,12 +496,12 @@
       ];
 
       const POWERUP_WEIGHTS = {
-        spring: 16,
-        jetpack: 12,
+        spring: 14,
+        jetpack: 14,
         propeller: 14,
         boots: 14,
         star: 14,
-        shotgun: 12
+        shotgun: 13
       };
 
       // Debug helpers
@@ -523,7 +523,7 @@
       // Prevent the same high-impact mobility powerup from spawning back-to-back.
       // Applies while active and for a short grace period after it ends.
       const POWERUP_SELF_COOLDOWN_MS = 6500;
-      const POWERUP_PITY_ALTITUDE_GAP = 850;
+      const POWERUP_PITY_ALTITUDE_GAP = 450;
       const GOONER_LINES = [
         "The law caught up eventually...",
         "Billy zigged when he should've zagged.",
@@ -3454,7 +3454,7 @@
           }
           const drought = altitude - (this.lastPowerupSpawnAltitude ?? -Infinity);
           const pity = drought >= POWERUP_PITY_ALTITUDE_GAP;
-          if (!pity && Math.random() > map(altitude, 0, 7000, 0.08, 0.13)) {
+          if (!pity && Math.random() > map(altitude, 0, 5000, 0.22, 0.40)) {
             return;
           }
           const powerupWeights = platform.spring
