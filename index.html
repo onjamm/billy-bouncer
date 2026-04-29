@@ -242,7 +242,8 @@
       const JETPACK_MS = 3000;
       const ROCKET_MS = 1500;
       const PROPELLER_MS = 3300;
-      const FRAGILE_RESPAWN_MS = 3200;
+      const PLATFORM_RESPAWN_MS = 2500;
+      const FRAGILE_RESPAWN_MS = PLATFORM_RESPAWN_MS;
       const OPENING_PLATFORM_COUNT = 12;
       const OPENING_PLATFORM_PATTERN = ["normal", "movingH", "normal", "movingH", "normal", "movingH", "normal", "movingH", "normal", "movingH", "normal"];
       const OPENING_GAP_MIN = 92;
@@ -268,7 +269,7 @@
       const LATE_X_CHALLENGE = 0.72;
       const MIN_SPAWN_X_OFFSET = 18;
       const SAFE_OPENING_ALTITUDE = 540;
-      const SAFE_ENEMY_START_ALTITUDE = 720;
+      const SAFE_ENEMY_START_ALTITUDE = 360;
       const SAFE_BLACK_HOLE_START_ALTITUDE = 2200;
       const PLAYFIELD_MIN_X = PLATFORM_EDGE_PADDING;
       const PLAYFIELD_MAX_X = GAME_W - PLATFORM_EDGE_PADDING;
@@ -279,7 +280,7 @@
       const ENEMY_BAND_SPACING = 138;
       const ENEMY_SAME_BAND_X_SPACING = 144;
       // If we go too long without an enemy, force the next eligible platform to spawn one.
-      const ENEMY_PITY_ALTITUDE_GAP = 820;
+      const ENEMY_PITY_ALTITUDE_GAP = 520;
       const PLATFORM_LANDING_STRIP = 42;
       const TILT_DEAD_ZONE = 2.5;
       const TILT_FULL_STEER = 28;
@@ -390,6 +391,10 @@
         shield: 15,
         shotgun: 12
       };
+
+      // Debug helpers
+      const DEBUG_FORCE_EARLY_SHOTGUN = new URLSearchParams(window.location.search).has("debugShotgun");
+      const DEBUG_PLATFORM_RESPAWN_ASSERTS = new URLSearchParams(window.location.search).has("debugRespawn");
 
       const ENEMY_WEIGHTS_LOW = { snake: 48, vulture: 22, heavy: 18, ufo: 12 };
       const ENEMY_WEIGHTS_HIGH = { snake: 20, vulture: 25, heavy: 26, ufo: 29 };
@@ -2114,6 +2119,7 @@
             shield: false,
             springBoots: 0,
             shotgunUntil: 0,
+            vanished: false,
             abducting: false,
             abductionEnemy: null
           };
@@ -2129,6 +2135,7 @@
           this.lastPlatformX = GAME_W / 2;
           this.lastSpawnPlatform = null;
           this.generatedPlatforms = 0;
+          this.debugShotgunSpawned = false;
 
           this.platforms = [];
           this.pickups = [];
@@ -2890,12 +2897,12 @@
 
         getEnemyScreenCap(altitude) {
           if (altitude < 2200) {
-            return 3;
-          }
-          if (altitude < 4500) {
             return 4;
           }
-          return 5;
+          if (altitude < 4500) {
+            return 5;
+          }
+          return 6;
         }
 
         choosePlatformEnemyX(platform, enemyWidth) {
@@ -3132,6 +3139,25 @@
         }
 
         maybeSpawnPowerup(platform, altitude) {
+          // Debug: force a shotgun pickup onto the 3rd platform (including the safe start platform),
+          // so we can test spread shots immediately.
+          if (DEBUG_FORCE_EARLY_SHOTGUN && !this.debugShotgunSpawned && this.generatedPlatforms === 2) {
+            const x = wrapPlayableX(platform.x);
+            const y = platform.y - 44;
+            if (this.canSpawnPickupCandidate(x, y)) {
+              this.pickups.push({
+                id: this.idCounter++,
+                type: "shotgun",
+                x,
+                y,
+                baseY: y,
+                bobPhase: Math.random() * Math.PI * 2,
+                radius: PICKUP_RADIUS
+              });
+              this.debugShotgunSpawned = true;
+              return;
+            }
+          }
           if (platform.safe || Math.random() > map(altitude, 0, 7000, 0.08, 0.13)) {
             return;
           }
@@ -3171,74 +3197,80 @@
 
           const drought = altitude - (this.lastEnemySpawnAltitude ?? -Infinity);
           const pity = drought >= ENEMY_PITY_ALTITUDE_GAP;
-          const spawnChance = map(altitude, 0, 7000, 0.18, 0.34);
+          const spawnChance = map(altitude, SAFE_ENEMY_START_ALTITUDE, 7000, 0.2, 0.46);
           if (!pity && Math.random() > spawnChance) {
             return;
           }
 
-          const type = chooseWeighted(this.getEnemyWeights(altitude));
-          const enemy = {
-            id: this.idCounter++,
-            type,
-            dead: false,
-            stompPending: false,
-            damaged: false,
-            hitFlashUntil: 0,
-            platform: null,
-            baseY: platform.y,
-            bobPhase: Math.random() * Math.PI * 2,
-            beamCharge: 0,
-            beamActive: false,
-            dir: Math.random() > 0.5 ? 1 : -1,
-            stepDistance: 0,
-            stepIndex: 0
-          };
+          const weights = this.getEnemyWeights(altitude);
+          let enemy = null;
 
-          if (type === "snake") {
-            const spawnX = this.choosePlatformEnemyX(platform, SNAKE_W);
-            if (spawnX === null) {
-              return;
+          // With narrower platforms, ground enemies (snake/heavy) can fail placement.
+          // Try a few rolls before giving up so "pity spawns" actually happen.
+          for (let attempt = 0; attempt < 4; attempt += 1) {
+            const type = chooseWeighted(weights);
+            const candidate = {
+              id: this.idCounter++,
+              type,
+              dead: false,
+              stompPending: false,
+              damaged: false,
+              hitFlashUntil: 0,
+              platform: null,
+              baseY: platform.y,
+              bobPhase: Math.random() * Math.PI * 2,
+              beamCharge: 0,
+              beamActive: false,
+              dir: Math.random() > 0.5 ? 1 : -1,
+              stepDistance: 0,
+              stepIndex: 0
+            };
+
+            if (type === "snake") {
+              const spawnX = this.choosePlatformEnemyX(platform, SNAKE_W);
+              if (spawnX === null) continue;
+              candidate.x = spawnX;
+              candidate.y = platform.y - 18;
+              candidate.w = SNAKE_W;
+              candidate.h = SNAKE_H;
+              candidate.hp = 1;
+              candidate.platform = platform;
+            } else if (type === "heavy") {
+              const spawnX = this.choosePlatformEnemyX(platform, HEAVY_W);
+              if (spawnX === null) continue;
+              candidate.x = spawnX;
+              candidate.y = platform.y - 26;
+              candidate.w = HEAVY_W;
+              candidate.h = HEAVY_H;
+              candidate.hp = 2;
+              candidate.platform = platform;
+            } else if (type === "vulture") {
+              const spawnX = this.chooseAirEnemyX(platform, VULTURE_W);
+              if (spawnX === null) continue;
+              candidate.x = spawnX;
+              candidate.y = platform.y - Phaser.Math.Between(56, 90);
+              candidate.w = VULTURE_W;
+              candidate.h = VULTURE_H;
+              candidate.hp = 1;
+            } else {
+              const spawnX = this.chooseAirEnemyX(platform, UFO_W);
+              if (spawnX === null) continue;
+              candidate.x = spawnX;
+              candidate.y = platform.y - Phaser.Math.Between(64, 112);
+              candidate.w = UFO_W;
+              candidate.h = UFO_H;
+              candidate.hp = 1;
             }
-            enemy.x = spawnX;
-            enemy.y = platform.y - 18;
-            enemy.w = SNAKE_W;
-            enemy.h = SNAKE_H;
-            enemy.hp = 1;
-            enemy.platform = platform;
-          } else if (type === "heavy") {
-            const spawnX = this.choosePlatformEnemyX(platform, HEAVY_W);
-            if (spawnX === null) {
-              return;
+
+            if (!this.canSpawnEnemyCandidate(candidate, platform, altitude)) {
+              continue;
             }
-            enemy.x = spawnX;
-            enemy.y = platform.y - 26;
-            enemy.w = HEAVY_W;
-            enemy.h = HEAVY_H;
-            enemy.hp = 2;
-            enemy.platform = platform;
-          } else if (type === "vulture") {
-            const spawnX = this.chooseAirEnemyX(platform, VULTURE_W);
-            if (spawnX === null) {
-              return;
-            }
-            enemy.x = spawnX;
-            enemy.y = platform.y - Phaser.Math.Between(56, 90);
-            enemy.w = VULTURE_W;
-            enemy.h = VULTURE_H;
-            enemy.hp = 1;
-          } else {
-            const spawnX = this.chooseAirEnemyX(platform, UFO_W);
-            if (spawnX === null) {
-              return;
-            }
-            enemy.x = spawnX;
-            enemy.y = platform.y - Phaser.Math.Between(64, 112);
-            enemy.w = UFO_W;
-            enemy.h = UFO_H;
-            enemy.hp = 1;
+
+            enemy = candidate;
+            break;
           }
 
-          if (!this.canSpawnEnemyCandidate(enemy, platform, altitude)) {
+          if (!enemy) {
             return;
           }
 
@@ -3655,6 +3687,7 @@
               platform.active = false;
               platform.breakAt = 0;
               platform.respawnAt = time + FRAGILE_RESPAWN_MS;
+              platform.disappearAt = time;
             }
 
             if (platform.falling) {
@@ -3666,6 +3699,10 @@
             }
 
             if (platform.type === "fragile" && platform.respawnAt > 0 && time >= platform.respawnAt) {
+              if (DEBUG_PLATFORM_RESPAWN_ASSERTS && platform.disappearAt) {
+                console.log(`[respawn] fragile dt=${Math.round(time - platform.disappearAt)}ms target=${FRAGILE_RESPAWN_MS}ms`);
+              }
+              platform.disappearAt = 0;
               platform.respawnAt = 0;
               platform.falling = false;
               platform.fallSpeed = 0;
@@ -3678,6 +3715,10 @@
             }
 
             if (platform.type === "vanish" && platform.hiddenUntil > 0 && time >= platform.hiddenUntil) {
+              if (DEBUG_PLATFORM_RESPAWN_ASSERTS && platform.disappearAt) {
+                console.log(`[respawn] vanish dt=${Math.round(time - platform.disappearAt)}ms target=${PLATFORM_RESPAWN_MS}ms`);
+              }
+              platform.disappearAt = 0;
               platform.hiddenUntil = 0;
               platform.visible = true;
               platform.active = true;
@@ -3688,6 +3729,22 @@
               platform.exploded = true;
               platform.active = false;
               platform.visible = false;
+              platform.respawnAt = time + PLATFORM_RESPAWN_MS;
+              platform.disappearAt = time;
+            }
+
+            if (platform.type === "explode" && platform.respawnAt > 0 && time >= platform.respawnAt) {
+              if (DEBUG_PLATFORM_RESPAWN_ASSERTS && platform.disappearAt) {
+                console.log(`[respawn] explode dt=${Math.round(time - platform.disappearAt)}ms target=${PLATFORM_RESPAWN_MS}ms`);
+              }
+              platform.disappearAt = 0;
+              platform.respawnAt = 0;
+              platform.exploded = false;
+              platform.explodeAt = 0;
+              platform.x = platform.baseX;
+              platform.y = platform.baseY;
+              platform.active = true;
+              platform.visible = true;
             }
           }
         }
@@ -3736,7 +3793,8 @@
             if (platform.type === "vanish") {
               platform.active = false;
               platform.visible = false;
-              platform.hiddenUntil = time + 2000;
+              platform.disappearAt = time;
+              platform.hiddenUntil = time + PLATFORM_RESPAWN_MS;
             }
 
             if (platform.type === "explode" && platform.explodeAt === 0) {
@@ -4176,7 +4234,8 @@
             const platform = this.platforms[i];
             const preserveFragileRespawn = platform.type === "fragile" && (platform.falling || platform.respawnAt > 0);
             const preserveVanishRespawn = platform.type === "vanish" && platform.hiddenUntil > 0;
-            const keep = ((platform.y > topCull && platform.y < bottomCull) || preserveFragileRespawn || preserveVanishRespawn) && !platform.exploded;
+            const preserveExplodeRespawn = platform.type === "explode" && platform.respawnAt > 0;
+            const keep = ((platform.y > topCull && platform.y < bottomCull) || preserveFragileRespawn || preserveVanishRespawn || preserveExplodeRespawn);
             if (keep) {
               this.platforms[platformWrite] = platform;
               platformWrite += 1;
@@ -4227,8 +4286,9 @@
           if (this.effects.length > maxEffects) {
             this.effects.splice(0, this.effects.length - maxEffects);
           }
-          if (this.pellets.length > MAX_PELLETS) {
-            this.pellets.splice(0, this.pellets.length - MAX_PELLETS);
+          const pelletCap = this.time.now < (this.playerState.shotgunUntil || 0) ? MAX_PELLETS_SHOTGUN : MAX_PELLETS;
+          if (this.pellets.length > pelletCap) {
+            this.pellets.splice(0, this.pellets.length - pelletCap);
           }
           if (topPlatform) {
             this.lastSpawnPlatform = topPlatform;
@@ -4418,15 +4478,12 @@
           this.spawnBurst(x, y, COLORS.ink, 7);
           this.spawnDust(x, y + 10);
           this.activatePoofText(x, y - 14, "BUSTED");
+          this.playerState.vanished = true;
+          if (this.player) {
+            this.player.setVisible(false);
+          }
           if (this.playerSprite) {
-            this.tweens.add({
-              targets: this.playerSprite,
-              alpha: 0,
-              scaleX: this.playerSprite.scaleX * 0.92,
-              scaleY: this.playerSprite.scaleY * 0.92,
-              duration: 260,
-              ease: "Quad.easeOut"
-            });
+            this.playerSprite.setVisible(false);
           }
           if (this.jetpackSprite) {
             this.jetpackSprite.setVisible(false);
@@ -4462,6 +4519,13 @@
           this.hideLeaderboardNamePrompt();
           this.physics.world.pause();
           this.player.body.setVelocity(0, 0);
+          if (this.player) {
+            this.player.setVisible(false);
+          }
+          if (this.playerSprite && !(options && options.animate)) {
+            // Non-animated deaths (falling off-screen, etc.) should also hide Billy immediately.
+            this.playerSprite.setVisible(false);
+          }
 
           const animate = options && options.animate;
           const delayMs = options && Number.isFinite(options.delayMs) ? options.delayMs : 900;
@@ -4624,13 +4688,18 @@
             propeller: this.time.now < this.playerState.propellerUntil,
             shield: this.playerState.shield,
             jetpack: this.time.now < this.playerState.jetpackUntil,
-            rocket: this.time.now < this.playerState.rocketUntil
+            rocket: this.time.now < this.playerState.rocketUntil,
+            vanished: this.playerState.vanished
           };
-          syncBanditSprite(this.playerSprite, playerDrawState, time, BANDIT_GAME_SCALE, BANDIT_GAME_Y_OFFSET);
+          if (playerDrawState.vanished) {
+            if (this.playerSprite) this.playerSprite.setVisible(false);
+          } else {
+            syncBanditSprite(this.playerSprite, playerDrawState, time, BANDIT_GAME_SCALE, BANDIT_GAME_Y_OFFSET);
+          }
           const spriteBounds = this.playerSprite && this.playerSprite.getBounds ? this.playerSprite.getBounds() : null;
           // Jetpack attachment: snap to Billy's back at a believable height.
           if (this.jetpackSprite) {
-            if (playerDrawState.jetpack) {
+            if (!playerDrawState.vanished && playerDrawState.jetpack) {
               const facing = playerDrawState.dir < 0 ? -1 : 1;
               const avgScale = (playerDrawState.scaleX + playerDrawState.scaleY) * 0.5;
               const renderScale = BANDIT_GAME_SCALE * avgScale;
@@ -4656,8 +4725,10 @@
             }
           }
 
-          drawBanditFx(this.worldLayer, playerDrawState, time, spriteBounds);
-          drawBanditOverlayFx(this.playerOverlayLayer, playerDrawState, time, spriteBounds);
+          if (!playerDrawState.vanished) {
+            drawBanditFx(this.worldLayer, playerDrawState, time, spriteBounds);
+            drawBanditOverlayFx(this.playerOverlayLayer, playerDrawState, time, spriteBounds);
+          }
 
           this.drawHUDDecor(time);
         }
