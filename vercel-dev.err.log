@@ -48,3 +48,6 @@ Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, li
 Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76
 Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76
 Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76
+Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76
+Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76
+Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76

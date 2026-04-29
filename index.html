@@ -1625,54 +1625,55 @@
       // ── Trophy icon for menu button ─────────────────────────────
       function drawMenuTrophyIcon(g, x, y, s) {
         g.clear();
-        const ink = COLORS.ink;
+        const ink      = COLORS.ink;
         const parchment = COLORS.parchment;
 
-        // Filled shapes
+        // ── Rounded base platform ───────────────────────────────────
         g.fillStyle(ink, 0.92);
+        g.fillRoundedRect(x - 6.8 * s, y + 5.4 * s, 13.6 * s, 3.0 * s, 1.4 * s);
 
-        // Base platform
-        g.fillRect(x - 5.8 * s, y + 6.0 * s, 11.6 * s, 2.4 * s);
+        // ── Pedestal stem ───────────────────────────────────────────
+        g.fillRect(x - 1.8 * s, y + 1.8 * s, 3.6 * s, 3.6 * s);
 
-        // Stem
-        g.fillRect(x - 2.0 * s, y + 2.4 * s, 4.0 * s, 3.6 * s);
-
-        // Cup body (trapezoid: wider at top)
-        const cupTopY = y - 6.0 * s;
-        const cupBotY = y + 2.4 * s;
-        const cupTopHW = 5.2 * s;
-        const cupBotHW = 2.6 * s;
+        // ── Cup body (trapezoid) ────────────────────────────────────
+        const ctY  = y - 6.2 * s;   // cup top Y
+        const cbY  = y + 1.8 * s;   // cup bottom Y
+        const ctHW = 5.8 * s;        // cup top half-width
+        const cbHW = 2.2 * s;        // cup bottom half-width
         g.fillPoints([
-          { x: x - cupTopHW, y: cupTopY },
-          { x: x + cupTopHW, y: cupTopY },
-          { x: x + cupBotHW, y: cupBotY },
-          { x: x - cupBotHW, y: cupBotY },
+          { x: x - ctHW, y: ctY },
+          { x: x + ctHW, y: ctY },
+          { x: x + cbHW, y: cbY },
+          { x: x - cbHW, y: cbY },
         ], true);
 
-        // Handles (stroke arcs, line caps round)
-        const handleMidY = y - 2.4 * s;
-        const handleR   = 2.5 * s;
-        g.lineStyle(2.0 * s, ink, 0.92);
+        // ── Rim cap (pill bar across the top opening) ───────────────
+        const rimHW = ctHW + 1.6 * s;
+        g.fillRoundedRect(x - rimHW, ctY - 2.0 * s, rimHW * 2, 2.8 * s, 1.4 * s);
 
-        // Left handle curves to the left (counterclockwise in canvas from 270° to 90°)
+        // ── Handles (thick arcs that visibly bow outward) ───────────
+        // Arc centers sit just inside the cup wall at handle mid-height
+        const handleMidY = y - 2.6 * s;
+        const handleR    = 3.4 * s;
+        g.lineStyle(3.4 * s, ink, 0.94);
+
         g.beginPath();
-        g.arc(x - cupTopHW + 0.5 * s, handleMidY, handleR,
+        g.arc(x - ctHW + 0.6 * s, handleMidY, handleR,
           Phaser.Math.DegToRad(270), Phaser.Math.DegToRad(90), true);
         g.strokePath();
 
-        // Right handle curves to the right (clockwise)
         g.beginPath();
-        g.arc(x + cupTopHW - 0.5 * s, handleMidY, handleR,
+        g.arc(x + ctHW - 0.6 * s, handleMidY, handleR,
           Phaser.Math.DegToRad(270), Phaser.Math.DegToRad(90), false);
         g.strokePath();
 
-        // Subtle shine on cup face
-        g.fillStyle(parchment, 0.17);
+        // ── Shine highlight on left face of cup ─────────────────────
+        g.fillStyle(parchment, 0.22);
         g.fillPoints([
-          { x: x - 2.5 * s, y: cupTopY + 1.0 * s },
-          { x: x - 0.5 * s, y: cupTopY + 1.0 * s },
-          { x: x - 1.2 * s, y: cupBotY - 0.6 * s },
-          { x: x - 3.0 * s, y: cupBotY - 0.6 * s },
+          { x: x - 3.0 * s, y: ctY + 1.4 * s },
+          { x: x - 0.6 * s, y: ctY + 1.4 * s },
+          { x: x - 1.4 * s, y: cbY - 0.6 * s },
+          { x: x - 3.6 * s, y: cbY - 0.6 * s },
         ], true);
       }
 
@@ -1741,7 +1742,7 @@
 
           const trophyButtonW = volumeButtonW;
           const trophyButtonH = volumeButtonH;
-          const trophyButtonX = volumeButtonX + volumeButtonW / 2 + 4 + trophyButtonW / 2;
+          const trophyButtonX = volumeButtonX + volumeButtonW / 2 + 10 + trophyButtonW / 2;
           const trophyButtonY = volumeButtonY;
           const trophyPanelW  = volumePanelW;
           const trophyPanelH  = 138;
