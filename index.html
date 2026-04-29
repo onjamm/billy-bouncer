@@ -140,6 +140,115 @@
       background: linear-gradient(180deg, rgba(61, 125, 125, 1), rgba(47, 98, 98, 1));
       box-shadow: 2px 2px 0 rgba(28, 18, 8, 0.15);
     }
+
+    /* Settings panel — same visual language as the volume panel */
+    .menu-settings-label {
+      font-family: Georgia, serif;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 0.14em;
+      color: rgba(28, 18, 8, 0.55);
+      display: block;
+      margin-bottom: 5px;
+    }
+    .menu-settings-vol-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+    .menu-settings-slider-wrap {
+      flex: 1;
+      position: relative;
+      height: 18px;
+    }
+    .menu-settings-slider-wrap .menu-volume-gauge {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 8px;
+      transform: translateY(-50%);
+    }
+    .menu-settings-mute-btn {
+      flex-shrink: 0;
+      font-family: Georgia, serif;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 0.06em;
+      color: #1C1208;
+      background: rgba(244, 228, 188, 0.98);
+      border: 2px solid rgba(28, 18, 8, 0.55);
+      border-radius: 6px;
+      padding: 3px 8px;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      line-height: 1;
+    }
+    .menu-settings-mute-btn:active { background: rgba(230, 214, 172, 1); }
+    .menu-settings-divider {
+      height: 1px;
+      background: rgba(28, 18, 8, 0.18);
+      margin: 8px 0 7px;
+    }
+    .menu-settings-reset-btn {
+      width: 100%;
+      display: block;
+      box-sizing: border-box;
+      font-family: Georgia, serif;
+      font-size: 12px;
+      font-weight: bold;
+      font-style: italic;
+      letter-spacing: 0.07em;
+      color: #B83020;
+      background: rgba(244, 228, 188, 0.98);
+      border: 2px solid rgba(184, 48, 32, 0.5);
+      border-radius: 8px;
+      padding: 5px 0;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      text-align: center;
+    }
+    .menu-settings-reset-btn:active { background: rgba(255, 238, 230, 1); }
+    .menu-settings-confirm {
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+    .menu-settings-confirm-text {
+      flex: 1;
+      font-family: Georgia, serif;
+      font-size: 11px;
+      font-style: italic;
+      color: #B83020;
+    }
+    .menu-settings-confirm-yes,
+    .menu-settings-confirm-no {
+      font-family: Georgia, serif;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 0.05em;
+      border-radius: 6px;
+      padding: 3px 9px;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      white-space: nowrap;
+    }
+    .menu-settings-confirm-yes {
+      color: #B83020;
+      background: rgba(244, 228, 188, 0.98);
+      border: 2px solid rgba(184, 48, 32, 0.55);
+    }
+    .menu-settings-confirm-no {
+      color: #1C1208;
+      background: rgba(244, 228, 188, 0.98);
+      border: 2px solid rgba(28, 18, 8, 0.45);
+    }
+    .menu-settings-confirm-yes:active { background: rgba(255, 238, 230, 1); }
+    .menu-settings-confirm-no:active  { background: rgba(230, 214, 172, 1); }
   </style>
 </head>
 <body>
@@ -387,10 +496,10 @@
       ];
 
       const POWERUP_WEIGHTS = {
-        spring: 20,
-        jetpack: 8,
-        propeller: 15,
-        boots: 13,
+        spring: 16,
+        jetpack: 12,
+        propeller: 14,
+        boots: 14,
         star: 14,
         shotgun: 12
       };
@@ -1386,6 +1495,36 @@
         }
       }
 
+
+      function drawMenuGearIcon(g, x, y, s) {
+        g.clear();
+        const ink   = COLORS.ink;
+        const bg    = COLORS.parchment;
+        const alpha = 0.92;
+        g.fillStyle(ink, alpha);
+
+        // 6-tooth gear outline via polygon points
+        const teeth  = 6;
+        const r1     = 6.4 * s;   // root circle radius
+        const r2     = 10.2 * s;  // tooth tip radius
+        const tw     = 0.30;      // half-tooth angular width (rad)
+        const pts    = [];
+        for (let i = 0; i < teeth; i++) {
+          const a = (i / teeth) * Math.PI * 2 - Math.PI / 2;
+          pts.push({ x: x + Math.cos(a - tw)        * r1, y: y + Math.sin(a - tw)        * r1 });
+          pts.push({ x: x + Math.cos(a - tw * 0.52) * r2, y: y + Math.sin(a - tw * 0.52) * r2 });
+          pts.push({ x: x + Math.cos(a + tw * 0.52) * r2, y: y + Math.sin(a + tw * 0.52) * r2 });
+          pts.push({ x: x + Math.cos(a + tw)        * r1, y: y + Math.sin(a + tw)        * r1 });
+        }
+        g.fillPoints(pts, true);
+
+        // Centre hole (parchment cutout)
+        g.fillStyle(bg, 1);
+        g.fillCircle(x, y, 3.6 * s);
+        g.lineStyle(1.5, ink, 0.7);
+        g.strokeCircle(x, y, 3.6 * s);
+      }
+
       // ============================================================
       // Menu scene
       // ============================================================
@@ -1444,8 +1583,8 @@
           const volumeButtonY = boardButtonY;
           const volumeButtonW = mobileBoard ? 44 : 46;
           const volumeButtonH = boardButtonH;
-          const volumePanelW = mobileBoard ? 204 : 220;
-          const volumePanelH = 34;
+          const volumePanelW = mobileBoard ? 218 : 232;
+          const volumePanelH = 132;
           const volumePanelX = volumeButtonX - volumeButtonW / 2 + volumePanelW / 2;
           const volumePanelY = volumeButtonY + volumeButtonH / 2 + volumePanelH / 2 + 4;
 
@@ -1513,11 +1652,8 @@
             .setStrokeStyle(3, COLORS.ink, 0.72);
           this.volumeButtonIcon = this.add.graphics();
           const volumeIconScale = mobileBoard ? 0.92 : 0.98;
-          this.updateMenuVolumeIcon = () => {
-            if (!this.volumeButtonIcon) return;
-            drawMenuVolumeIcon(this.volumeButtonIcon, volumeButtonX, volumeButtonY, volumeIconScale, this.audio.getVolume());
-          };
-          this.updateMenuVolumeIcon();
+          drawMenuGearIcon(this.volumeButtonIcon, volumeButtonX, volumeButtonY, volumeIconScale);
+          this.updateMenuVolumeIcon = () => { /* gear icon is static */ };
 
           this.boardPanel = this.add.rectangle(boardPanelX, boardPanelY, boardPanelW, boardPanelH, COLORS.parchment, 0.97)
             .setStrokeStyle(3, COLORS.ink, 0.5)
@@ -1629,13 +1765,25 @@
           this.domMenuStartBtn = makeBtn("Start game");
           this.domMenuBoardBtn = makeBtn("Toggle leaderboard");
           this.domMenuBoardCloseBtn = makeBtn("Close leaderboard");
-          this.domMenuVolumeBtn = makeBtn("Adjust volume");
+          this.domMenuVolumeBtn = makeBtn("Open settings");
 
+          // ── Settings panel ─────────────────────────────────────────────
           this.domMenuVolumePanel = document.createElement("div");
           this.domMenuVolumePanel.className = "menu-volume-panel";
-          this.domMenuVolumePanel.setAttribute("role", "group");
-          this.domMenuVolumePanel.setAttribute("aria-label", "Volume");
+          this.domMenuVolumePanel.setAttribute("role", "dialog");
+          this.domMenuVolumePanel.setAttribute("aria-label", "Settings");
           this.domMenuVolumePanel.style.display = "none";
+
+          // Volume row
+          const volLabel = document.createElement("div");
+          volLabel.className = "menu-settings-label";
+          volLabel.textContent = "VOLUME";
+
+          const volRow = document.createElement("div");
+          volRow.className = "menu-settings-vol-row";
+
+          const sliderWrap = document.createElement("div");
+          sliderWrap.className = "menu-settings-slider-wrap";
 
           const gauge = document.createElement("div");
           gauge.className = "menu-volume-gauge";
@@ -1648,27 +1796,94 @@
           range.step = "1";
           range.value = String(Math.round((this.audio ? this.audio.getVolume() : DEFAULT_VOLUME) * 100));
           range.setAttribute("aria-label", "Volume");
+
+          const muteBtn = document.createElement("button");
+          muteBtn.className = "menu-settings-mute-btn";
+          muteBtn.type = "button";
+          muteBtn.setAttribute("aria-label", "Toggle mute");
+
+          sliderWrap.append(gauge, range);
+          volRow.append(sliderWrap, muteBtn);
+
+          // Divider
+          const settingsDivider = document.createElement("div");
+          settingsDivider.className = "menu-settings-divider";
+
+          // Reset progress
+          const resetBtn = document.createElement("button");
+          resetBtn.className = "menu-settings-reset-btn";
+          resetBtn.type = "button";
+          resetBtn.textContent = "RESET PROGRESS";
+
+          const confirmRow = document.createElement("div");
+          confirmRow.className = "menu-settings-confirm";
+
+          const confirmText = document.createElement("span");
+          confirmText.className = "menu-settings-confirm-text";
+          confirmText.textContent = "Sure about that, outlaw?";
+
+          const confirmYes = document.createElement("button");
+          confirmYes.className = "menu-settings-confirm-yes";
+          confirmYes.type = "button";
+          confirmYes.textContent = "WIPE IT";
+
+          const confirmNo = document.createElement("button");
+          confirmNo.className = "menu-settings-confirm-no";
+          confirmNo.type = "button";
+          confirmNo.textContent = "CANCEL";
+
+          confirmRow.append(confirmText, confirmYes, confirmNo);
+          this.domMenuVolumePanel.append(volLabel, volRow, settingsDivider, resetBtn, confirmRow);
+          document.body.appendChild(this.domMenuVolumePanel);
+          this.domMenuVolumeRange = range;
+
+          // Helper: sync mute button label to current audio state
+          const syncMuteLabel = () => {
+            const muted = this.audio ? this.audio.getVolume() <= 0.001 : false;
+            muteBtn.textContent = muted ? "UNMUTE" : "MUTE";
+          };
+          syncMuteLabel();
+
           range.addEventListener("input", () => {
             const value = clamp(Number(range.value) / 100, 0, 1);
-            if (this.audio && this.audio.setVolume) {
-              this.audio.setVolume(value);
-            }
-            if (this.updateMenuVolumeIcon) {
-              this.updateMenuVolumeIcon();
-            }
+            if (this.audio && this.audio.setVolume) this.audio.setVolume(value);
+            syncMuteLabel();
           });
           range.addEventListener("keydown", (e) => {
             if (e && e.key === "Escape") {
               this.setVolumeOpen(false);
-              if (this.domMenuVolumeBtn) {
-                this.domMenuVolumeBtn.focus();
-              }
+              if (this.domMenuVolumeBtn) this.domMenuVolumeBtn.focus();
             }
           });
-
-          this.domMenuVolumePanel.append(gauge, range);
-          document.body.appendChild(this.domMenuVolumePanel);
-          this.domMenuVolumeRange = range;
+          muteBtn.addEventListener("click", () => {
+            if (this.audio && this.audio.toggleMute) this.audio.toggleMute();
+            if (this.domMenuVolumeRange) {
+              this.domMenuVolumeRange.value = String(Math.round((this.audio ? this.audio.getVolume() : DEFAULT_VOLUME) * 100));
+            }
+            syncMuteLabel();
+          });
+          resetBtn.addEventListener("click", () => {
+            resetBtn.style.display = "none";
+            confirmRow.style.display = "flex";
+          });
+          confirmNo.addEventListener("click", () => {
+            confirmRow.style.display = "none";
+            resetBtn.style.display = "";
+          });
+          confirmYes.addEventListener("click", () => {
+            try {
+              [BEST_SCORE_KEY, LEADERBOARD_LAST_SUBMITTED_KEY, GAME_OVER_TITLE_SEEN_KEY, LEADERBOARD_HANDLE_KEY]
+                .forEach(k => localStorage.removeItem(k));
+            } catch (_) {}
+            this.setVolumeOpen(false);
+            confirmRow.style.display = "none";
+            resetBtn.style.display = "";
+            if (this.best && this.best.setText) this.best.setText("BEST: 0 FT");
+            if (this.medalTrack && this.medalTrack.setText) {
+              this.medalTrack.setText(getMedalProgressText(0));
+              this.medalTrack.setColor(Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(0)).rgba);
+            }
+          });
 
           const start = (e) => {
             if (e && e.preventDefault) e.preventDefault();
@@ -1691,44 +1906,14 @@
               this.domMenuBoardBtn.focus();
             }
           };
-          const applyVolumeToUI = (focusSlider) => {
-            if (this.domMenuVolumeRange) {
-              this.domMenuVolumeRange.value = String(Math.round((this.audio ? this.audio.getVolume() : DEFAULT_VOLUME) * 100));
-              if (focusSlider) {
-                this.domMenuVolumeRange.focus();
-              }
-            }
-            if (this.updateMenuVolumeIcon) {
-              this.updateMenuVolumeIcon();
-            }
-          };
-          const toggleVolumePanel = () => {
-            this.setVolumeOpen(!this.volumeOpen);
-            if (this.volumeOpen) {
-              applyVolumeToUI(true);
-            }
-          };
-          const toggleMute = () => {
-            if (this.audio && this.audio.toggleMute) {
-              this.audio.toggleMute();
-            } else if (this.audio && this.audio.setVolume) {
-              const v = this.audio.getVolume ? this.audio.getVolume() : DEFAULT_VOLUME;
-              this.audio.setVolume(v > 0.001 ? 0 : DEFAULT_VOLUME);
-            }
-            applyVolumeToUI(false);
-          };
-          const handleVolumePress = (e) => {
+          const handleSettingsPress = (e) => {
             if (e && e.preventDefault) e.preventDefault();
-            if (this.menuVolumeTapTimer) {
-              clearTimeout(this.menuVolumeTapTimer);
-              this.menuVolumeTapTimer = null;
-              toggleMute();
-              return;
+            const opening = !this.volumeOpen;
+            this.setVolumeOpen(opening);
+            if (opening && this.domMenuVolumeRange) {
+              this.domMenuVolumeRange.value = String(Math.round((this.audio ? this.audio.getVolume() : DEFAULT_VOLUME) * 100));
+              this.domMenuVolumeRange.focus();
             }
-            this.menuVolumeTapTimer = setTimeout(() => {
-              this.menuVolumeTapTimer = null;
-              toggleVolumePanel();
-            }, 220);
           };
 
           this.domMenuStartBtn.addEventListener("click", start);
@@ -1737,8 +1922,8 @@
           this.domMenuBoardBtn.addEventListener("touchend", toggleBoard, { passive: false });
           this.domMenuBoardCloseBtn.addEventListener("click", closeBoard);
           this.domMenuBoardCloseBtn.addEventListener("touchend", closeBoard, { passive: false });
-          this.domMenuVolumeBtn.addEventListener("click", handleVolumePress);
-          this.domMenuVolumeBtn.addEventListener("touchend", handleVolumePress, { passive: false });
+          this.domMenuVolumeBtn.addEventListener("click", handleSettingsPress);
+          this.domMenuVolumeBtn.addEventListener("touchend", handleSettingsPress, { passive: false });
 
           // Keep buttons lined up with the canvas even after mobile viewport changes.
           this.positionMenuDOMButtons = () => this.positionMenuDOMButtonsImpl();
