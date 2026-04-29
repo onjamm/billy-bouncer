@@ -2205,6 +2205,7 @@
           this.bestScore = Number(localStorage.getItem(BEST_SCORE_KEY) || 0);
           this.lastShotAt = -SHOT_COOLDOWN;
           this.gameOverShown = false;
+          this.medalSplashContainer = null;
           this.pendingLeaderboardScore = 0;
           this.leaderboardSubmitMessage = "";
           this.awaitingLeaderboardName = false;
@@ -4721,13 +4722,20 @@
           this.medalText.setColor(Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(this.score)).rgba);
           const nextBest = Math.max(this.bestScore, this.score);
           localStorage.setItem(BEST_SCORE_KEY, String(nextBest));
-          const lastSubmitted = Number(localStorage.getItem(LEADERBOARD_LAST_SUBMITTED_KEY) || 0);
-          if (canUseOnlineLeaderboard() && this.score > 0 && this.score > lastSubmitted) {
-            this.showLeaderboardNamePrompt(this.score);
-            return;
+          const proceedAfterSplash = () => {
+            const lastSubmitted = Number(localStorage.getItem(LEADERBOARD_LAST_SUBMITTED_KEY) || 0);
+            if (canUseOnlineLeaderboard() && this.score > 0 && this.score > lastSubmitted) {
+              this.showLeaderboardNamePrompt(this.score);
+              return;
+            }
+            this.revealGameOverOverlay();
+            void this.maybeSubmitLeaderboardScore(this.score);
+          };
+          if (this.score >= 10000) {
+            this.showMedalSplash(this.score, proceedAfterSplash);
+          } else {
+            proceedAfterSplash();
           }
-          this.revealGameOverOverlay();
-          void this.maybeSubmitLeaderboardScore(this.score);
         }
 
         triggerGameOver(options = null) {
@@ -4760,6 +4768,114 @@
           }
 
           this.finalizeGameOver();
+        }
+
+        showMedalSplash(score, onComplete) {
+          const SPLASH_TIERS = [
+            { min: 50000, label: "PLATINUM", ribbonColor: 0x607888, rimColor: 0x405868, bodyColor: 0xC8DDE8, innerColor: 0xE0EEF5, starColor: "#3A5060" },
+            { min: 30000, label: "GOLD",     ribbonColor: 0xB8860B, rimColor: 0x967000, bodyColor: 0xFFD700, innerColor: 0xFFE84A, starColor: "#7A5500" },
+            { min: 20000, label: "SILVER",   ribbonColor: 0x707070, rimColor: 0x505050, bodyColor: 0xB4B4B4, innerColor: 0xD4D4D4, starColor: "#343434" },
+            { min: 10000, label: "BRONZE",   ribbonColor: 0x7A4A20, rimColor: 0x603810, bodyColor: 0xC07830, innerColor: 0xDC9850, starColor: "#4A2808" },
+          ];
+          const tier = SPLASH_TIERS.find(t => score >= t.min);
+          if (!tier) { onComplete(); return; }
+
+          const cx = GAME_W / 2;
+          const cy = GAME_H / 2;
+          // Natural draw radius — container scale does the size work
+          const medalR = 100;
+          // Start big: 40 % of screen height = 320 px diameter → radius 160
+          const startScale = (GAME_H * 0.20) / medalR; // 1.6
+
+          // Final position: small icon just left of the score text
+          let finalX;
+          try {
+            const tb = this.finalScore.getBounds();
+            finalX = tb.left - 12 - (medalR * 0.28);
+          } catch (_) {
+            finalX = cx - 108;
+          }
+          const finalY   = GAME_OVER_SCORE_Y;
+          const finalScale = 0.28; // displayed radius ≈ 28 px
+
+          // ── Build container ───────────────────────────────────────────────
+          const container = this.add.container(cx, cy)
+            .setScrollFactor(0)
+            .setDepth(250)
+            .setScale(0);
+          this.medalSplashContainer = container;
+
+          const g = this.add.graphics();
+
+          // Ribbon tab above circle
+          g.fillStyle(tier.ribbonColor, 1);
+          g.fillRect(-14, -medalR - 28, 28, 30);
+          // Rim
+          g.lineStyle(8, tier.rimColor, 1);
+          g.strokeCircle(0, 0, medalR);
+          // Body fill
+          g.fillStyle(tier.bodyColor, 1);
+          g.fillCircle(0, 0, medalR - 4);
+          // Soft highlight gleam (upper-left)
+          g.fillStyle(0xFFFFFF, 0.22);
+          g.fillCircle(-28, -28, 38);
+          // Inner decorative ring
+          g.lineStyle(3, tier.rimColor, 0.65);
+          g.strokeCircle(0, 0, medalR - 22);
+          // Second inner ring
+          g.lineStyle(1.5, tier.rimColor, 0.35);
+          g.strokeCircle(0, 0, medalR - 38);
+
+          const starText = this.add.text(0, -14, "★", {
+            fontFamily: "Georgia, serif",
+            fontSize: "54px",
+            color: tier.starColor,
+          }).setOrigin(0.5, 0.5);
+
+          const labelText = this.add.text(0, 34, tier.label, {
+            fontFamily: "Georgia, serif",
+            fontSize: "16px",
+            fontStyle: "bold",
+            color: tier.starColor,
+          }).setOrigin(0.5, 0.5);
+
+          container.add([g, starText, labelText]);
+
+          // ── Animation ─────────────────────────────────────────────────────
+          // Step 1: pop in (scale 0 → startScale*1.06 → startScale)
+          this.tweens.add({
+            targets: container,
+            scaleX: startScale * 1.06,
+            scaleY: startScale * 1.06,
+            duration: 280,
+            ease: "Back.Out",
+            onComplete: () => {
+              this.tweens.add({
+                targets: container,
+                scaleX: startScale,
+                scaleY: startScale,
+                duration: 110,
+                ease: "Quad.InOut",
+                onComplete: () => {
+                  // Step 2: hold a beat, then fly to score position
+                  this.time.delayedCall(580, () => {
+                    this.tweens.add({
+                      targets: container,
+                      x: finalX,
+                      y: finalY,
+                      scaleX: finalScale,
+                      scaleY: finalScale,
+                      duration: 540,
+                      ease: "Cubic.InOut",
+                      onComplete: () => {
+                        onComplete();
+                      }
+                    });
+                  });
+                }
+              });
+            }
+          });
         }
 
         shutdown() {
@@ -4807,6 +4923,7 @@
           this.pellets.length = 0;
           this.effects.length = 0;
           [
+            this.medalSplashContainer,
             this.overlay,
             this.finalScore,
             this.medalText,
