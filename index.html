@@ -2248,7 +2248,8 @@
           return (
             this.hasSpringInvincibility(time) ||
             time < this.playerState.jetpackUntil ||
-            time < this.playerState.propellerUntil
+            time < this.playerState.propellerUntil ||
+            this.playerState.springBoots > 0
           );
         }
 
@@ -3785,6 +3786,8 @@
               if (this.powerupCooldownUntil) {
                 this.powerupCooldownUntil.boots = Math.max(this.powerupCooldownUntil.boots || 0, this.time.now + POWERUP_SELF_COOLDOWN_MS);
               }
+              // 1-second grace window after the last boot bounce, matching other powerups.
+              this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.time.now + POST_POWERUP_INVINCIBILITY_MS);
             }
           }
 
