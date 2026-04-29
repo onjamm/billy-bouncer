@@ -405,6 +405,7 @@
 
       // Star invincibility (this is the only invincibility that shows the rainbow outline).
       const STAR_INVINCIBILITY_MS = 3200;
+      const POST_POWERUP_INVINCIBILITY_MS = 1000;
 
       const ENEMY_WEIGHTS_LOW = { snake: 48, vulture: 22, heavy: 18, ufo: 12 };
       const ENEMY_WEIGHTS_HIGH = { snake: 20, vulture: 25, heavy: 26, ufo: 29 };
@@ -3978,17 +3979,24 @@
               this.player.body.velocity.y = PICKUP_SPRING_VELOCITY;
               this.playerState.springBoostActive = true;
               this.stretchLaunch();
+              // Small grace window after powerups so you don't instantly eat damage mid-transition.
+              this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, time + POST_POWERUP_INVINCIBILITY_MS);
             } else if (pickup.type === "jetpack") {
               this.playerState.jetpackUntil = time + JETPACK_MS;
               // Ensure jetpack is always invincible even if other code paths only check invincibleUntil.
-              this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.jetpackUntil);
+              this.playerState.invincibleUntil = Math.max(
+                this.playerState.invincibleUntil || 0,
+                this.playerState.jetpackUntil + POST_POWERUP_INVINCIBILITY_MS
+              );
               if (this.powerupCooldownUntil) {
                 this.powerupCooldownUntil.jetpack = Math.max(this.powerupCooldownUntil.jetpack || 0, this.playerState.jetpackUntil + POWERUP_SELF_COOLDOWN_MS);
               }
             } else if (pickup.type === "rocket") {
               this.playerState.rocketUntil = time + ROCKET_MS;
+              this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.rocketUntil + POST_POWERUP_INVINCIBILITY_MS);
             } else if (pickup.type === "propeller") {
               this.playerState.propellerUntil = time + PROPELLER_MS;
+              this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.propellerUntil + POST_POWERUP_INVINCIBILITY_MS);
               if (this.powerupCooldownUntil) {
                 this.powerupCooldownUntil.propeller = Math.max(
                   this.powerupCooldownUntil.propeller || 0,
@@ -4000,7 +4008,10 @@
               this.playerState.bootsCooldownPending = true;
             } else if (pickup.type === "star") {
               this.playerState.starUntil = time + STAR_INVINCIBILITY_MS;
-              this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.starUntil);
+              this.playerState.invincibleUntil = Math.max(
+                this.playerState.invincibleUntil || 0,
+                this.playerState.starUntil + POST_POWERUP_INVINCIBILITY_MS
+              );
             } else if (pickup.type === "shotgun") {
               this.playerState.shotgunAmmo = SHOTGUN_SHELLS;
             }
