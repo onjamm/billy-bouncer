@@ -238,7 +238,7 @@
       const MENU_BOUNCE_PERIOD = 920;
       const MENU_DEMO_CYCLE_MS = 5200;
       const MENU_DEMO_VX = PLAYER_SPEED * 0.24;
-      const SHOTGUN_MS = 8500;
+      const SHOTGUN_SHELLS = 6;
       const JETPACK_MS = 3000;
       const ROCKET_MS = 1500;
       const PROPELLER_MS = 3300;
@@ -279,8 +279,13 @@
       const ENEMY_SAFE_LANE_WIDTH = 126;
       const ENEMY_BAND_SPACING = 138;
       const ENEMY_SAME_BAND_X_SPACING = 144;
+      // Enemy spawn pacing ramps up with altitude (calmer early, busier late).
+      const ENEMY_SPAWN_RAMP_END_ALTITUDE = 9000;
+      const ENEMY_SPAWN_CHANCE_START = 0.12;
+      const ENEMY_SPAWN_CHANCE_END = 0.34;
       // If we go too long without an enemy, force the next eligible platform to spawn one.
-      const ENEMY_PITY_ALTITUDE_GAP = 520;
+      const ENEMY_PITY_ALTITUDE_GAP_START = 900;
+      const ENEMY_PITY_ALTITUDE_GAP_END = 560;
       const PLATFORM_LANDING_STRIP = 42;
       const TILT_DEAD_ZONE = 2.5;
       const TILT_FULL_STEER = 28;
@@ -493,6 +498,10 @@
         const t = (altitude - PLATFORM_SHRINK_START_ALTITUDE) / (PLATFORM_SHRINK_END_ALTITUDE - PLATFORM_SHRINK_START_ALTITUDE);
         const eased = smoothstep(t);
         return Math.round(lerp(PLATFORM_W, PLATFORM_MIN_W, eased));
+      }
+
+      function getEnemySpawnT(altitude) {
+        return smoothstep((altitude - SAFE_ENEMY_START_ALTITUDE) / (ENEMY_SPAWN_RAMP_END_ALTITUDE - SAFE_ENEMY_START_ALTITUDE));
       }
 
       function preloadBanditTextures(scene) {
@@ -2118,7 +2127,7 @@
             springBoostActive: false,
             shield: false,
             springBoots: 0,
-            shotgunUntil: 0,
+            shotgunAmmo: 0,
             vanished: false,
             abducting: false,
             abductionEnemy: null
@@ -2897,12 +2906,12 @@
 
         getEnemyScreenCap(altitude) {
           if (altitude < 2200) {
+            return 3;
+          }
+          if (altitude < 6000) {
             return 4;
           }
-          if (altitude < 4500) {
-            return 5;
-          }
-          return 6;
+          return 5;
         }
 
         choosePlatformEnemyX(platform, enemyWidth) {
@@ -3196,8 +3205,10 @@
           }
 
           const drought = altitude - (this.lastEnemySpawnAltitude ?? -Infinity);
-          const pity = drought >= ENEMY_PITY_ALTITUDE_GAP;
-          const spawnChance = map(altitude, SAFE_ENEMY_START_ALTITUDE, 7000, 0.2, 0.46);
+          const spawnT = getEnemySpawnT(altitude);
+          const pityGap = Math.round(lerp(ENEMY_PITY_ALTITUDE_GAP_START, ENEMY_PITY_ALTITUDE_GAP_END, spawnT));
+          const pity = drought >= pityGap;
+          const spawnChance = lerp(ENEMY_SPAWN_CHANCE_START, ENEMY_SPAWN_CHANCE_END, spawnT);
           if (!pity && Math.random() > spawnChance) {
             return;
           }
@@ -3862,7 +3873,7 @@
             } else if (pickup.type === "shield") {
               this.playerState.shield = true;
             } else if (pickup.type === "shotgun") {
-              this.playerState.shotgunUntil = time + SHOTGUN_MS;
+              this.playerState.shotgunAmmo = SHOTGUN_SHELLS;
             }
             this.releaseEntitySprite(pickup);
           }
@@ -4139,7 +4150,8 @@
 
         tryShoot(targetX, targetY) {
           const now = this.time.now;
-          const shotgunActive = now < (this.playerState.shotgunUntil || 0);
+          const shotgunActive =
+            (this.playerState.shotgunAmmo || 0) > 0;
           const cooldown = shotgunActive ? SHOTGUN_COOLDOWN : SHOT_COOLDOWN;
           const pelletCap = shotgunActive ? MAX_PELLETS_SHOTGUN : MAX_PELLETS;
           const shotCount = shotgunActive ? 3 : 1;
@@ -4184,6 +4196,7 @@
                 trail: []
               });
             }
+            this.playerState.shotgunAmmo = Math.max(0, (this.playerState.shotgunAmmo || 0) - 1);
           }
 
           this.lastShotAt = now;
@@ -4286,7 +4299,9 @@
           if (this.effects.length > maxEffects) {
             this.effects.splice(0, this.effects.length - maxEffects);
           }
-          const pelletCap = this.time.now < (this.playerState.shotgunUntil || 0) ? MAX_PELLETS_SHOTGUN : MAX_PELLETS;
+          const shotgunActive =
+            (this.playerState.shotgunAmmo || 0) > 0;
+          const pelletCap = shotgunActive ? MAX_PELLETS_SHOTGUN : MAX_PELLETS;
           if (this.pellets.length > pelletCap) {
             this.pellets.splice(0, this.pellets.length - pelletCap);
           }
