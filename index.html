@@ -393,14 +393,17 @@
         rocket: 8,
         propeller: 14,
         boots: 16,
-        shield: 15,
+        star: 15,
         shotgun: 12
       };
 
       // Debug helpers
       const DEBUG_FORCE_EARLY_SHOTGUN = new URLSearchParams(window.location.search).has("debugShotgun");
       const DEBUG_PLATFORM_RESPAWN_ASSERTS = new URLSearchParams(window.location.search).has("debugRespawn");
-      const DEBUG_START_SHIELD = new URLSearchParams(window.location.search).has("debugGlow");
+      const DEBUG_START_STAR = new URLSearchParams(window.location.search).has("debugStar");
+
+      // Star invincibility (this is the only invincibility that shows the rainbow outline).
+      const STAR_INVINCIBILITY_MS = 3200;
 
       const ENEMY_WEIGHTS_LOW = { snake: 48, vulture: 22, heavy: 18, ufo: 12 };
       const ENEMY_WEIGHTS_HIGH = { snake: 20, vulture: 25, heavy: 26, ufo: 29 };
@@ -2180,6 +2183,7 @@
             rocketUntil: 0,
             propellerUntil: 0,
             invincibleUntil: 0,
+            starUntil: 0,
             springBoostActive: false,
             shield: false,
             springBoots: 0,
@@ -2193,8 +2197,9 @@
           };
           // Cooldowns for powerup spawning (prevents repeats of jetpack/propeller/boots).
           this.powerupCooldownUntil = { jetpack: 0, propeller: 0, boots: 0 };
-          if (DEBUG_START_SHIELD) {
-            this.playerState.shield = true;
+          if (DEBUG_START_STAR) {
+            this.playerState.starUntil = this.time.now + STAR_INVINCIBILITY_MS;
+            this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.starUntil);
           }
 
           this.highestY = this.player.y;
@@ -3239,7 +3244,7 @@
                 rocket: POWERUP_WEIGHTS.rocket,
                 propeller: POWERUP_WEIGHTS.propeller,
                 boots: POWERUP_WEIGHTS.boots,
-                shield: POWERUP_WEIGHTS.shield,
+                star: POWERUP_WEIGHTS.star,
                 shotgun: POWERUP_WEIGHTS.shotgun
               }
             : POWERUP_WEIGHTS;
@@ -3978,8 +3983,9 @@
             } else if (pickup.type === "boots") {
               this.playerState.springBoots = BOOTS_BOUNCES;
               this.playerState.bootsCooldownPending = true;
-            } else if (pickup.type === "shield") {
-              this.playerState.shield = true;
+            } else if (pickup.type === "star") {
+              this.playerState.starUntil = time + STAR_INVINCIBILITY_MS;
+              this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.starUntil);
             } else if (pickup.type === "shotgun") {
               this.playerState.shotgunAmmo = SHOTGUN_SHELLS;
             }
@@ -4813,9 +4819,9 @@
             }
           }
 
-          // Visual "invincibility" indicator: only show the rainbow outline for the shield.
+          // Visual invincibility indicator: only show the rainbow outline for the Star powerup.
           // Other invincibility sources (jetpack/rocket/propeller/spring) intentionally have no glow.
-          const invincibleFx = this.playerState.shield;
+          const invincibleFx = time < (this.playerState.starUntil || 0);
           const playerDrawState = {
             x: this.player.x,
             y: this.player.y,
@@ -5562,7 +5568,7 @@
           g.lineStyle(3, COLORS.ink, 1);
           g.strokeRect(pickup.x - 12, pickup.y - 6, 10, 18);
           g.strokeRect(pickup.x + 2, pickup.y - 6, 10, 18);
-        } else if (pickup.type === "shield") {
+        } else if (pickup.type === "star") {
           g.fillStyle(0x64A0DC, 0.35);
           g.fillCircle(pickup.x, pickup.y, 16);
           g.lineStyle(3, COLORS.white, 0.9);
