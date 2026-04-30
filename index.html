@@ -599,6 +599,7 @@
         jetpack: 5,
         propeller: 14,
         boots: 14,
+        shield: 12,
         star: 14,
         shotgun: 13
       };
@@ -615,9 +616,7 @@
       const ENEMY_WEIGHTS_LOW = { snake: 48, vulture: 22, heavy: 18, ufo: 12 };
       const ENEMY_WEIGHTS_HIGH = { snake: 20, vulture: 25, heavy: 26, ufo: 29 };
 
-      // While invincible (jetpack/propeller/spring), Billy can "body-check" and delete a limited
-      // number of enemies. Keeps invincibility useful without turning it into a full screen clear.
-      const INVINCIBLE_ENEMY_KILLS_PER_WINDOW = 2;
+      const SHIELD_CHARGES = 2;
 
       // Prevent the same high-impact mobility powerup from spawning back-to-back.
       // Applies while active and for a short grace period after it ends.
@@ -2638,18 +2637,16 @@
             invincibleUntil: 0,
             starUntil: 0,
             springBoostActive: false,
-            shield: false,
+            shieldCharges: 0,
             springBoots: 0,
             bootsCooldownPending: false,
-            invincibleKillsLeft: 0,
-            invincibleKillsActive: false,
             shotgunAmmo: 0,
             vanished: false,
             abducting: false,
             abductionEnemy: null
           };
           // Cooldowns for powerup spawning (prevents repeats of jetpack/propeller/boots).
-          this.powerupCooldownUntil = { jetpack: 0, propeller: 0, boots: 0 };
+          this.powerupCooldownUntil = { jetpack: 0, propeller: 0, boots: 0, shield: 0 };
           if (DEBUG_START_STAR) {
             this.playerState.starUntil = this.time.now + STAR_INVINCIBILITY_MS;
             this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.starUntil);
@@ -2711,6 +2708,8 @@
           if (type === "shotgun") return true;
           // Invincibility (star) is always collectible, even while other powerups are active.
           if (type === "star") return true;
+          // Shield is always collectible (no timer; charge-based).
+          if (type === "shield") return true;
 
           const jetpackActive = time < this.playerState.jetpackUntil;
           const propellerActive = time < this.playerState.propellerUntil;
@@ -3761,6 +3760,7 @@
                 jetpack: POWERUP_WEIGHTS.jetpack,
                 propeller: POWERUP_WEIGHTS.propeller,
                 boots: POWERUP_WEIGHTS.boots,
+                shield: POWERUP_WEIGHTS.shield,
                 star: POWERUP_WEIGHTS.star,
                 shotgun: POWERUP_WEIGHTS.shotgun
               }
@@ -3781,6 +3781,10 @@
             if (type === "boots") {
               const until = this.powerupCooldownUntil?.boots || 0;
               return now < until || this.playerState.springBoots > 0 || this.playerState.bootsCooldownPending;
+            }
+            if (type === "shield") {
+              const until = this.powerupCooldownUntil?.shield || 0;
+              return now < until || (this.playerState.shieldCharges || 0) > 0;
             }
             return false;
           };
@@ -4309,16 +4313,20 @@
           this.spawnDust(this.player.x, sourceY);
         }
 
-        consumeShield(pushSourceX, pushSourceY) {
-          if (!this.playerState.shield) {
+        consumeShield(pushSourceX, pushSourceY, options = {}) {
+          const { knockback = true } = options;
+          const charges = this.playerState.shieldCharges || 0;
+          if (charges <= 0) {
             return false;
           }
-          const dx = this.player.x - pushSourceX;
-          const dy = this.player.y - pushSourceY;
-          const mag = Math.max(1, Math.hypot(dx, dy));
-          this.player.body.velocity.x += (dx / mag) * 340;
-          this.player.body.velocity.y = -580;
-          this.playerState.shield = false;
+          this.playerState.shieldCharges = Math.max(0, charges - 1);
+          if (knockback) {
+            const dx = this.player.x - pushSourceX;
+            const dy = this.player.y - pushSourceY;
+            const mag = Math.max(1, Math.hypot(dx, dy));
+            this.player.body.velocity.x += (dx / mag) * 340;
+            this.player.body.velocity.y = -580;
+          }
           this.playerState.flashUntil = this.time.now + 120;
           return true;
         }
@@ -4561,6 +4569,14 @@
               this.playerState.propellerUntil = 0;
               this.playerState.springBoots = BOOTS_BOUNCES;
               this.playerState.bootsCooldownPending = true;
+            } else if (pickup.type === "shield") {
+              this.playerState.shieldCharges = SHIELD_CHARGES;
+              if (this.powerupCooldownUntil) {
+                this.powerupCooldownUntil.shield = Math.max(
+                  this.powerupCooldownUntil.shield || 0,
+                  time + POWERUP_SELF_COOLDOWN_MS
+                );
+              }
             } else if (pickup.type === "star") {
               this.playerState.starUntil = time + STAR_INVINCIBILITY_MS;
               this.playerState.invincibleUntil = Math.max(
@@ -4656,7 +4672,7 @@
                   this.player.y < enemy.y + Ufo_BEAM_HEIGHT &&
                   !this.gameOverShown;
 
-                const beamBlocked = this.hasPowerupInvincibility(time) || this.playerState.shield;
+                const beamBlocked = this.hasPowerupInvincibility(time) || (this.playerState.shieldCharges || 0) > 0;
                 enemy.beamActive = inBeam && !beamBlocked;
                 enemy.beamCharge = enemy.beamActive ? enemy.beamCharge + this.game.loop.delta : 0;
                 if (enemy.beamCharge >= Ufo_ABDUCT_MS && !this.playerState.abducting) {
@@ -4700,16 +4716,7 @@
             return;
           }
 
-          const invincible = this.hasPowerupInvincibility();
-          if (invincible) {
-            if (!this.playerState.invincibleKillsActive) {
-              this.playerState.invincibleKillsActive = true;
-              this.playerState.invincibleKillsLeft = INVINCIBLE_ENEMY_KILLS_PER_WINDOW;
-            }
-          } else if (this.playerState.invincibleKillsActive) {
-            this.playerState.invincibleKillsActive = false;
-            this.playerState.invincibleKillsLeft = 0;
-          }
+          const powerupInvincible = this.hasPowerupInvincibility();
 
           const propellerActive = this.time.now < this.playerState.propellerUntil;
 
@@ -4751,27 +4758,20 @@
               continue;
             }
 
-            // Invincibility prevents the player from taking damage, but should not prevent stomps.
-            // New: allow a limited number of "body-check" kills per invincibility window.
+            const shieldActive = (this.playerState.shieldCharges || 0) > 0;
+            const invincible = powerupInvincible || shieldActive;
+
+            // Invincibility kills enemies on contact (with poof).
             if (invincible) {
-              if (this.playerState.invincibleKillsLeft > 0) {
-                this.playerState.invincibleKillsLeft -= 1;
-                this.damageEnemy(enemy, enemy.hp);
-                this.spawnBurst(enemy.x, enemy.y, COLORS.white, 3);
+              this.damageEnemy(enemy, enemy.hp);
+              if (!powerupInvincible && shieldActive) {
+                this.consumeShield(enemy.x, enemy.y, { knockback: false });
               }
               continue;
             }
 
-            if (this.playerState.shield) {
-              this.damageEnemy(enemy, enemy.hp);
-              this.consumeShield(enemy.x, enemy.y);
-              return;
-            }
-
-            if (!this.consumeShield(enemy.x, enemy.y)) {
-              this.triggerGameOver({ animate: true, delayMs: 900 });
-              return;
-            }
+            this.triggerGameOver({ animate: true, delayMs: 900 });
+            return;
           }
         }
 
@@ -5549,7 +5549,7 @@
             shooting: this.playerState.shootingUntil > this.time.now,
             flash: this.playerState.flashUntil > this.time.now,
             propeller: this.time.now < this.playerState.propellerUntil,
-            shield: this.playerState.shield,
+            shield: (this.playerState.shieldCharges || 0) > 0,
             jetpack: this.time.now < this.playerState.jetpackUntil,
             vanished: this.playerState.vanished,
             invincibleFx
@@ -6260,6 +6260,20 @@
           g.lineStyle(3, COLORS.ink, 1);
           g.strokeRect(pickup.x - 12, pickup.y - 6, 10, 18);
           g.strokeRect(pickup.x + 2, pickup.y - 6, 10, 18);
+        } else if (pickup.type === "shield") {
+          g.fillStyle(0x64A0DC, 0.28);
+          g.fillCircle(pickup.x, pickup.y, 16);
+          g.lineStyle(3, COLORS.ink, 0.9);
+          g.strokeCircle(pickup.x, pickup.y, 16);
+          g.lineStyle(3, COLORS.white, 0.85);
+          g.beginPath();
+          g.moveTo(pickup.x, pickup.y - 10);
+          g.lineTo(pickup.x, pickup.y + 10);
+          g.strokePath();
+          g.beginPath();
+          g.moveTo(pickup.x - 10, pickup.y);
+          g.lineTo(pickup.x + 10, pickup.y);
+          g.strokePath();
         } else if (pickup.type === "star") {
           g.fillStyle(0x64A0DC, 0.35);
           g.fillCircle(pickup.x, pickup.y, 16);
