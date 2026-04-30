@@ -2709,6 +2709,8 @@
         canCollectPickup(type, time = this.time.now) {
           // Shotgun is always collectible, even while other powerups are active.
           if (type === "shotgun") return true;
+          // Invincibility (star) is always collectible, even while other powerups are active.
+          if (type === "star") return true;
 
           const jetpackActive = time < this.playerState.jetpackUntil;
           const propellerActive = time < this.playerState.propellerUntil;
