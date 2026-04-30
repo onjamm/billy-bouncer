@@ -2707,18 +2707,20 @@
         }
 
         canCollectPickup(type, time = this.time.now) {
+          // Shotgun is always collectible, even while other powerups are active.
+          if (type === "shotgun") return true;
+
           const jetpackActive = time < this.playerState.jetpackUntil;
           const propellerActive = time < this.playerState.propellerUntil;
           const bootsActive = this.playerState.springBoots > 0;
           const starActive = time < this.playerState.starUntil;
           const springBurstActive = !!this.playerState.springBoostActive;
-          const shotgunActive = this.playerState.shotgunAmmo > 0;
 
-          const anyPowerupActive = jetpackActive || propellerActive || bootsActive || starActive || springBurstActive || shotgunActive;
+          const anyPowerupActive = jetpackActive || propellerActive || bootsActive || starActive || springBurstActive;
           if (!anyPowerupActive) return true;
 
           // Non-stackable powerups block all other pickups while active.
-          if (bootsActive || starActive || springBurstActive || shotgunActive) return false;
+          if (bootsActive || starActive || springBurstActive) return false;
 
           // Only allowed stack: jetpack + propeller hat (and only if you don't already have both).
           if (jetpackActive && !propellerActive) return type === "propeller";
