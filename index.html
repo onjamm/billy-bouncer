@@ -391,8 +391,10 @@
       const PLATFORM_SPRING_VELOCITY = -1300;
       const PICKUP_SPRING_VELOCITY = -1450;
       const JETPACK_VELOCITY = -1000;
-      const JETPACK_PROPELLER_COMBO_VELOCITY = -1220; // propeller-first combo: ~22% faster
-      const PROPELLER_LIFT_VELOCITY = -430;
+      // Propeller hat is now 1.25x stronger than before.
+      const PROPELLER_LIFT_VELOCITY = -430 * 1.25;
+      // Only allowed stack: jetpack + propeller hat. When both are active, their lift adds.
+      const JETPACK_PROPELLER_COMBO_VELOCITY = JETPACK_VELOCITY + PROPELLER_LIFT_VELOCITY;
       const BOOTS_VELOCITY = -1060;
       const BOOTS_BOUNCES = 5;
       const PELLET_SPEED = 980;
@@ -2633,7 +2635,6 @@
             flashUntil: 0,
             jetpackUntil: 0,
             propellerUntil: 0,
-            propellerJetpackCombo: false,
             invincibleUntil: 0,
             starUntil: 0,
             springBoostActive: false,
@@ -2703,6 +2704,27 @@
             time < this.playerState.propellerUntil ||
             this.playerState.springBoots > 0
           );
+        }
+
+        canCollectPickup(type, time = this.time.now) {
+          const jetpackActive = time < this.playerState.jetpackUntil;
+          const propellerActive = time < this.playerState.propellerUntil;
+          const bootsActive = this.playerState.springBoots > 0;
+          const starActive = time < this.playerState.starUntil;
+          const springBurstActive = !!this.playerState.springBoostActive;
+          const shotgunActive = this.playerState.shotgunAmmo > 0;
+
+          const anyPowerupActive = jetpackActive || propellerActive || bootsActive || starActive || springBurstActive || shotgunActive;
+          if (!anyPowerupActive) return true;
+
+          // Non-stackable powerups block all other pickups while active.
+          if (bootsActive || starActive || springBurstActive || shotgunActive) return false;
+
+          // Only allowed stack: jetpack + propeller hat (and only if you don't already have both).
+          if (jetpackActive && !propellerActive) return type === "propeller";
+          if (propellerActive && !jetpackActive) return type === "jetpack";
+
+          return false;
         }
 
         createRenderCaches() {
@@ -4184,20 +4206,19 @@
             this.playerState.dir = move < 0 ? -1 : 1;
           }
 
-          if (time < this.playerState.jetpackUntil) {
-            const comboActive = this.playerState.propellerJetpackCombo && time < this.playerState.propellerUntil;
+          const jetpackActive = time < this.playerState.jetpackUntil;
+          const propellerActive = time < this.playerState.propellerUntil;
+          const comboActive = jetpackActive && propellerActive;
+
+          if (jetpackActive) {
             body.velocity.y = Math.min(body.velocity.y, comboActive ? JETPACK_PROPELLER_COMBO_VELOCITY : JETPACK_VELOCITY);
             this.audio.setJetpack(true);
           } else {
             this.audio.setJetpack(false);
           }
 
-          if (time < this.playerState.propellerUntil) {
-            // If jetpack combo is active the jetpack velocity already dominates; only
-            // apply standalone propeller lift when jetpack isn't also running.
-            if (!(this.playerState.propellerJetpackCombo && time < this.playerState.jetpackUntil)) {
-              body.velocity.y = Math.min(body.velocity.y, PROPELLER_LIFT_VELOCITY);
-            }
+          if (propellerActive && !jetpackActive) {
+            body.velocity.y = Math.min(body.velocity.y, PROPELLER_LIFT_VELOCITY);
           }
 
           if (this.playerState.springBoostActive && body.velocity.y >= 0) {
@@ -4487,6 +4508,12 @@
               continue;
             }
 
+            if (!this.canCollectPickup(pickup.type, time)) {
+              this.pickups[write] = pickup;
+              write += 1;
+              continue;
+            }
+
             this.playerState.flashUntil = time + 90;
             this.audio.powerup();
 
@@ -4497,19 +4524,7 @@
               // Small grace window after powerups so you don't instantly eat damage mid-transition.
               this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, time + POST_POWERUP_INVINCIBILITY_MS);
             } else if (pickup.type === "jetpack") {
-              // Combo rule: propeller MUST already be active for the stack to be allowed.
-              // Any other situation → cancel the existing movement powerup first.
-              const propellerRunning = time < this.playerState.propellerUntil;
-              if (propellerRunning) {
-                // ★ Propeller-first combo — keep propeller running, flag the boost
-                this.playerState.propellerJetpackCombo = true;
-              } else {
-                // Cancel any active movement powerup before firing the jetpack
-                this.playerState.propellerUntil = 0;
-                this.playerState.propellerJetpackCombo = false;
-                this.playerState.springBoots = 0;
-                this.playerState.bootsCooldownPending = false;
-              }
+              // Jetpack stacks only with propeller hat. Other stacks are blocked by canCollectPickup().
               this.playerState.jetpackUntil = time + JETPACK_MS;
               this.playerState.invincibleUntil = Math.max(
                 this.playerState.invincibleUntil || 0,
@@ -4519,11 +4534,7 @@
                 this.powerupCooldownUntil.jetpack = Math.max(this.powerupCooldownUntil.jetpack || 0, this.playerState.jetpackUntil + POWERUP_SELF_COOLDOWN_MS);
               }
             } else if (pickup.type === "propeller") {
-              // Picking up propeller always replaces whatever movement powerup is active.
-              this.playerState.jetpackUntil = 0;
-              this.playerState.propellerJetpackCombo = false;
-              this.playerState.springBoots = 0;
-              this.playerState.bootsCooldownPending = false;
+              // Propeller hat stacks only with jetpack. Other stacks are blocked by canCollectPickup().
               this.playerState.propellerUntil = time + PROPELLER_MS;
               this.playerState.invincibleUntil = Math.max(this.playerState.invincibleUntil || 0, this.playerState.propellerUntil + POST_POWERUP_INVINCIBILITY_MS);
               if (this.powerupCooldownUntil) {
@@ -4536,7 +4547,6 @@
               // Boots cancel any active timed movement powerup.
               this.playerState.jetpackUntil = 0;
               this.playerState.propellerUntil = 0;
-              this.playerState.propellerJetpackCombo = false;
               this.playerState.springBoots = BOOTS_BOUNCES;
               this.playerState.bootsCooldownPending = true;
             } else if (pickup.type === "star") {
