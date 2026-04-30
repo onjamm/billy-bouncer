@@ -4830,13 +4830,9 @@
             }
 
             if (dist < BLACK_HOLE_KILL_RADIUS) {
-              if (this.hasPowerupInvincibility()) {
-                continue;
-              }
-              if (!this.consumeShield(hole.x, hole.y)) {
-                // Black holes don't kill anymore: they scramble you upward.
-                this.teleportPlayerFromBlackHole(hole);
-              }
+              // Black holes don't kill: they always scramble you upward.
+              // Never consume shield charges here (black holes are meant to be "usable", not punitive).
+              this.teleportPlayerFromBlackHole(hole);
             }
           }
           this.audio.setBlackHoleLevel(highestLevel);
