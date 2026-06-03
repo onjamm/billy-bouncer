@@ -345,6 +345,289 @@
       color: rgba(28, 18, 8, 0.32);
       text-align: center;
     }
+
+    /* ── Outlaw leaderboard panel ───────────────────────────────── */
+    .menu-outlaw-panel {
+      position: fixed;
+      z-index: 140;
+      display: none;
+      box-sizing: border-box;
+      border: 3px solid #1C1208;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(184, 48, 32, 0.06) 0%, transparent 42%),
+        radial-gradient(circle at 88% 92%, rgba(201, 150, 10, 0.08) 0%, transparent 38%),
+        rgba(244, 228, 188, 0.97);
+      border-radius: 12px;
+      box-shadow: 4px 4px 0 rgba(184, 48, 32, 0.28), inset 0 0 0 1px rgba(255, 252, 235, 0.35);
+      padding: 12px 12px 10px;
+      pointer-events: auto;
+      backdrop-filter: blur(1px);
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: opacity 0.16s ease, transform 0.16s ease;
+      overflow: hidden;
+    }
+    .menu-outlaw-panel.is-open {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .menu-outlaw-panel::before {
+      content: "";
+      position: absolute;
+      top: -8px;
+      width: 14px;
+      height: 14px;
+      background: rgba(244, 228, 188, 0.97);
+      transform: rotate(45deg);
+      border-left: 3px solid #1C1208;
+      border-top: 3px solid #1C1208;
+    }
+    .menu-outlaw-panel.anchor-right::before { right: 24px; left: auto; }
+    .menu-outlaw-panel.anchor-center::before { left: 50%; margin-left: -7px; }
+
+    .menu-outlaw-nail {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 34% 34%, #A8A8A8 0%, #505050 55%, #2A2420 100%);
+      box-shadow: 0 1px 2px rgba(28, 18, 8, 0.35);
+      pointer-events: none;
+    }
+    .menu-outlaw-nail-tl { top: 7px; left: 11px; }
+    .menu-outlaw-nail-tr { top: 7px; right: 11px; }
+
+    .menu-outlaw-close {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      z-index: 2;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #5E442C;
+      font-family: Georgia, serif;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      border-radius: 4px;
+    }
+    .menu-outlaw-close:focus-visible {
+      outline: 3px solid rgba(28, 18, 8, 0.78);
+      outline-offset: 1px;
+    }
+
+    .menu-outlaw-header {
+      text-align: center;
+      margin-bottom: 8px;
+      padding-top: 2px;
+    }
+    .menu-outlaw-title {
+      font-family: Georgia, serif;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1.4px;
+      color: rgba(28, 18, 8, 0.62);
+      text-transform: uppercase;
+    }
+    .menu-outlaw-subtitle {
+      font-family: Georgia, serif;
+      font-size: 11px;
+      font-style: italic;
+      color: #B83020;
+      margin-top: 2px;
+      letter-spacing: 0.02em;
+    }
+
+    .menu-outlaw-podium {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .menu-outlaw-podium-top {
+      display: flex;
+      justify-content: center;
+    }
+    .menu-outlaw-podium-bottom {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .menu-outlaw-slot {
+      box-sizing: border-box;
+      border: 2px solid rgba(28, 18, 8, 0.22);
+      border-radius: 9px;
+      background: rgba(248, 237, 207, 0.72);
+      padding: 7px 8px 6px;
+      min-height: 54px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      text-align: center;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+    }
+    .menu-outlaw-slot.rank-1 {
+      width: 100%;
+      min-height: 62px;
+      border-color: rgba(201, 150, 10, 0.55);
+      background:
+        linear-gradient(180deg, rgba(255, 248, 220, 0.95) 0%, rgba(248, 230, 170, 0.88) 100%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 2px 6px rgba(201, 150, 10, 0.18);
+    }
+    .menu-outlaw-slot.rank-2 {
+      border-color: rgba(144, 144, 144, 0.45);
+      background: linear-gradient(180deg, rgba(248, 246, 242, 0.95) 0%, rgba(230, 228, 224, 0.88) 100%);
+    }
+    .menu-outlaw-slot.rank-3 {
+      border-color: rgba(160, 120, 32, 0.42);
+      background: linear-gradient(180deg, rgba(252, 241, 220, 0.95) 0%, rgba(235, 210, 165, 0.88) 100%);
+    }
+    .menu-outlaw-slot.is-player {
+      border-color: rgba(184, 48, 32, 0.72);
+      box-shadow: inset 3px 0 0 rgba(184, 48, 32, 0.85), 0 2px 8px rgba(184, 48, 32, 0.12);
+    }
+    .menu-outlaw-slot.is-vacant {
+      opacity: 0.55;
+      border-style: dashed;
+      background: rgba(244, 228, 188, 0.35);
+    }
+
+    .menu-outlaw-rank-badge {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Georgia, serif;
+      font-size: 11px;
+      font-weight: bold;
+      color: rgba(255, 252, 235, 0.96);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+      box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.22);
+      flex-shrink: 0;
+    }
+    .menu-outlaw-slot.rank-1 .menu-outlaw-rank-badge {
+      width: 26px;
+      height: 26px;
+      font-size: 12px;
+      background: radial-gradient(circle at 36% 36%, #FFE860 0%, #D4A800 55%, #967000 100%);
+    }
+    .menu-outlaw-slot.rank-2 .menu-outlaw-rank-badge {
+      background: radial-gradient(circle at 36% 36%, #ECECEC 0%, #A8A8A8 55%, #505050 100%);
+    }
+    .menu-outlaw-slot.rank-3 .menu-outlaw-rank-badge {
+      background: radial-gradient(circle at 36% 36%, #E8A850 0%, #A07820 55%, #603810 100%);
+    }
+    .menu-outlaw-slot.is-vacant .menu-outlaw-rank-badge {
+      background: rgba(220, 205, 170, 0.55);
+      color: rgba(28, 18, 8, 0.35);
+      text-shadow: none;
+      box-shadow: none;
+    }
+
+    .menu-outlaw-name {
+      font-family: Georgia, serif;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 0.04em;
+      color: #1C1208;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .menu-outlaw-slot.rank-1 .menu-outlaw-name { font-size: 13px; }
+    .menu-outlaw-score {
+      font-family: Georgia, serif;
+      font-size: 10px;
+      font-weight: bold;
+      font-variant-numeric: tabular-nums;
+      color: rgba(28, 18, 8, 0.68);
+      letter-spacing: 0.03em;
+    }
+    .menu-outlaw-slot.rank-1 .menu-outlaw-score { font-size: 11px; color: rgba(28, 18, 8, 0.78); }
+    .menu-outlaw-slot.is-vacant .menu-outlaw-name {
+      font-size: 10px;
+      font-style: italic;
+      font-weight: normal;
+      color: rgba(28, 18, 8, 0.38);
+    }
+
+    .menu-outlaw-footer {
+      margin-top: 8px;
+      padding-top: 7px;
+      border-top: 1px solid rgba(28, 18, 8, 0.14);
+      font-family: Georgia, serif;
+      font-size: 10px;
+      line-height: 1.35;
+      text-align: center;
+      color: rgba(28, 18, 8, 0.58);
+    }
+    .menu-outlaw-footer.is-player-on-board {
+      color: #B83020;
+      font-style: italic;
+      font-weight: bold;
+    }
+
+    .menu-outlaw-state {
+      display: none;
+      text-align: center;
+      padding: 14px 6px 10px;
+      font-family: Georgia, serif;
+    }
+    .menu-outlaw-state.is-visible { display: block; }
+    .menu-outlaw-state-title {
+      font-size: 12px;
+      font-weight: bold;
+      color: #5E442C;
+      margin-bottom: 4px;
+    }
+    .menu-outlaw-state-copy {
+      font-size: 11px;
+      font-style: italic;
+      color: rgba(28, 18, 8, 0.55);
+      line-height: 1.4;
+    }
+
+    .menu-outlaw-skeleton .menu-outlaw-slot {
+      animation: outlaw-shimmer 1.15s ease-in-out infinite;
+    }
+    .menu-outlaw-skeleton .menu-outlaw-slot:nth-child(2) { animation-delay: 0.12s; }
+    .menu-outlaw-skeleton .menu-outlaw-name,
+    .menu-outlaw-skeleton .menu-outlaw-score {
+      width: 72%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(28, 18, 8, 0.12);
+      color: transparent;
+    }
+    .menu-outlaw-skeleton .menu-outlaw-score { width: 48%; height: 7px; margin-top: 2px; }
+
+    @keyframes outlaw-shimmer {
+      0%, 100% { opacity: 0.42; }
+      50% { opacity: 0.92; }
+    }
+
+    /* Outlaw name prompt — wanted-poster framing */
+    .outlaw-name-prompt {
+      border: 3px solid rgba(28, 18, 8, 0.62) !important;
+      box-shadow:
+        4px 4px 0 rgba(184, 48, 32, 0.22),
+        inset 0 0 0 1px rgba(255, 252, 235, 0.35) !important;
+    }
+    .outlaw-name-prompt-title {
+      letter-spacing: 0.12em !important;
+      color: #B83020 !important;
+    }
   </style>
 </head>
 <body>
@@ -1018,14 +1301,248 @@
           .slice(0, 12);
       }
 
-      function formatLeaderboardEntries(entries) {
-        if (!entries || entries.length === 0) {
-          return "No outlaws posted yet.";
+      function getOutlawBoardPlayerName() {
+        try {
+          return sanitizeLeaderboardName(localStorage.getItem(LEADERBOARD_HANDLE_KEY) || "");
+        } catch {
+          return "";
         }
-        return entries
-          .slice(0, 3)
-          .map((entry, index) => `${index + 1}. ${entry.name} - ${formatPoints(entry.score)} FT`)
-          .join("\n");
+      }
+
+      function getOutlawBoardBestScore() {
+        try {
+          return Number(localStorage.getItem(BEST_SCORE_KEY) || 0);
+        } catch {
+          return 0;
+        }
+      }
+
+      function fillOutlawBoardSlot(slotEl, rank, entry, playerName) {
+        if (!slotEl) {
+          return;
+        }
+        slotEl.className = "menu-outlaw-slot rank-" + rank + (entry ? "" : " is-vacant") + (entry && playerName && entry.name === playerName ? " is-player" : "");
+        const rankBadge = slotEl.querySelector(".menu-outlaw-rank-badge");
+        const nameEl = slotEl.querySelector(".menu-outlaw-name");
+        const scoreEl = slotEl.querySelector(".menu-outlaw-score");
+        if (rankBadge) {
+          rankBadge.textContent = String(rank);
+        }
+        if (nameEl) {
+          nameEl.textContent = entry ? entry.name : "Vacant";
+        }
+        if (scoreEl) {
+          scoreEl.textContent = entry ? `${formatPoints(entry.score)} FT` : "—";
+        }
+      }
+
+      function renderOutlawBoardPanel(panel, state, entries) {
+        if (!panel) {
+          return;
+        }
+
+        const podiumEl = panel.querySelector(".menu-outlaw-podium");
+        const footerEl = panel.querySelector(".menu-outlaw-footer");
+        const slots = {
+          1: panel.querySelector(".menu-outlaw-slot.rank-1"),
+          2: panel.querySelector(".menu-outlaw-slot.rank-2"),
+          3: panel.querySelector(".menu-outlaw-slot.rank-3")
+        };
+        const stateEls = panel.querySelectorAll(".menu-outlaw-state");
+
+        stateEls.forEach((el) => el.classList.remove("is-visible"));
+        if (podiumEl) {
+          podiumEl.style.display = "none";
+          podiumEl.classList.remove("menu-outlaw-skeleton");
+        }
+        if (footerEl) {
+          footerEl.style.display = "none";
+          footerEl.textContent = "";
+          footerEl.classList.remove("is-player-on-board");
+        }
+
+        const showState = (key, title, copy) => {
+          const el = panel.querySelector(`.menu-outlaw-state[data-state="${key}"]`);
+          if (!el) {
+            return;
+          }
+          const titleEl = el.querySelector(".menu-outlaw-state-title");
+          const copyEl = el.querySelector(".menu-outlaw-state-copy");
+          if (titleEl) {
+            titleEl.textContent = title;
+          }
+          if (copyEl) {
+            copyEl.textContent = copy;
+          }
+          el.classList.add("is-visible");
+        };
+
+        if (state === "loading") {
+          if (podiumEl) {
+            podiumEl.style.display = "flex";
+            podiumEl.classList.add("menu-outlaw-skeleton");
+          }
+          for (let rank = 1; rank <= 3; rank += 1) {
+            fillOutlawBoardSlot(slots[rank], rank, { name: "···", score: 0 }, "");
+            const nameEl = slots[rank] && slots[rank].querySelector(".menu-outlaw-name");
+            const scoreEl = slots[rank] && slots[rank].querySelector(".menu-outlaw-score");
+            if (nameEl) {
+              nameEl.textContent = "";
+            }
+            if (scoreEl) {
+              scoreEl.textContent = "";
+            }
+          }
+          return;
+        }
+
+        if (state === "offline") {
+          showState("offline", "Saloon board offline", "The outlaw board only rides on the live HTTPS build.");
+          return;
+        }
+
+        if (state === "error") {
+          showState("error", "Board's gone quiet", "Couldn't fetch the outlaw list. Try again in a spell.");
+          return;
+        }
+
+        const list = (entries || []).slice(0, 3);
+        if (state === "empty" || list.length === 0) {
+          showState("empty", "No posters yet", "Be the first outlaw to claim a spot on the board.");
+          const bestScore = getOutlawBoardBestScore();
+          const playerName = getOutlawBoardPlayerName();
+          if (footerEl && bestScore > 0) {
+            footerEl.style.display = "block";
+            footerEl.textContent = playerName
+              ? `${playerName}'s best: ${formatPoints(bestScore)} FT`
+              : `Your best: ${formatPoints(bestScore)} FT`;
+          }
+          return;
+        }
+
+        if (podiumEl) {
+          podiumEl.style.display = "flex";
+        }
+
+        const playerName = getOutlawBoardPlayerName();
+        const bestScore = getOutlawBoardBestScore();
+        let playerOnBoard = false;
+
+        for (let rank = 1; rank <= 3; rank += 1) {
+          const entry = list[rank - 1] || null;
+          fillOutlawBoardSlot(slots[rank], rank, entry, playerName);
+          if (entry && playerName && entry.name === playerName) {
+            playerOnBoard = true;
+          }
+        }
+
+        if (!footerEl) {
+          return;
+        }
+
+        footerEl.style.display = "block";
+        if (playerOnBoard) {
+          footerEl.textContent = "That's you on the poster, outlaw.";
+          footerEl.classList.add("is-player-on-board");
+        } else if (bestScore > 0) {
+          footerEl.textContent = playerName
+            ? `${playerName}'s best: ${formatPoints(bestScore)} FT — not on the poster yet`
+            : `Your best: ${formatPoints(bestScore)} FT — not on the poster yet`;
+        } else {
+          footerEl.style.display = "none";
+        }
+      }
+
+      function createOutlawBoardSlot(rank) {
+        const slot = document.createElement("div");
+        slot.className = "menu-outlaw-slot rank-" + rank;
+
+        const rankBadge = document.createElement("div");
+        rankBadge.className = "menu-outlaw-rank-badge";
+        rankBadge.textContent = String(rank);
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "menu-outlaw-name";
+
+        const scoreEl = document.createElement("div");
+        scoreEl.className = "menu-outlaw-score";
+
+        slot.append(rankBadge, nameEl, scoreEl);
+        return slot;
+      }
+
+      function buildOutlawBoardPanel() {
+        const panel = document.createElement("div");
+        panel.className = "menu-outlaw-panel anchor-right";
+        panel.setAttribute("role", "dialog");
+        panel.setAttribute("aria-label", "Outlaw leaderboard");
+        panel.style.display = "none";
+
+        const nailLeft = document.createElement("div");
+        nailLeft.className = "menu-outlaw-nail menu-outlaw-nail-tl";
+        const nailRight = document.createElement("div");
+        nailRight.className = "menu-outlaw-nail menu-outlaw-nail-tr";
+
+        const closeBtn = document.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.className = "menu-outlaw-close";
+        closeBtn.setAttribute("aria-label", "Close outlaw board");
+        closeBtn.textContent = "×";
+
+        const header = document.createElement("div");
+        header.className = "menu-outlaw-header";
+        const title = document.createElement("div");
+        title.className = "menu-outlaw-title";
+        title.textContent = "OUTLAWS";
+        const subtitle = document.createElement("div");
+        subtitle.className = "menu-outlaw-subtitle";
+        subtitle.textContent = "Most wanted bounces";
+        header.append(title, subtitle);
+
+        const podium = document.createElement("div");
+        podium.className = "menu-outlaw-podium";
+
+        const podiumTop = document.createElement("div");
+        podiumTop.className = "menu-outlaw-podium-top";
+        podiumTop.appendChild(createOutlawBoardSlot(1));
+
+        const podiumBottom = document.createElement("div");
+        podiumBottom.className = "menu-outlaw-podium-bottom";
+        podiumBottom.append(createOutlawBoardSlot(2), createOutlawBoardSlot(3));
+
+        podium.append(podiumTop, podiumBottom);
+
+        const footer = document.createElement("div");
+        footer.className = "menu-outlaw-footer";
+        footer.setAttribute("aria-live", "polite");
+
+        const makeState = (key, title, copy) => {
+          const state = document.createElement("div");
+          state.className = "menu-outlaw-state";
+          state.dataset.state = key;
+          const stateTitle = document.createElement("div");
+          stateTitle.className = "menu-outlaw-state-title";
+          stateTitle.textContent = title;
+          const stateCopy = document.createElement("div");
+          stateCopy.className = "menu-outlaw-state-copy";
+          stateCopy.textContent = copy;
+          state.append(stateTitle, stateCopy);
+          return state;
+        };
+
+        panel.append(
+          nailLeft,
+          nailRight,
+          closeBtn,
+          header,
+          podium,
+          footer,
+          makeState("empty", "No posters yet", "Be the first outlaw to claim a spot on the board."),
+          makeState("offline", "Saloon board offline", "The outlaw board only rides on the live HTTPS build."),
+          makeState("error", "Board's gone quiet", "Couldn't fetch the outlaw list. Try again in a spell.")
+        );
+
+        return { panel, closeBtn };
       }
 
       function bootDotsText(count) {
@@ -1722,16 +2239,12 @@
           const boardButtonY = mobileBoard ? 48 : 52;
           const boardButtonW = mobileBoard ? 98 : 112;
           const boardButtonH = mobileBoard ? 36 : 38;
-          const boardPanelW = mobileBoard ? 232 : 146;
-          const boardPanelH = mobileBoard ? 182 : 176;
-          const boardPanelX = mobileBoard ? centerX : GAME_W - 72;
-          const boardPanelY = mobileBoard ? 314 : 262;
-          const boardPanelTop = boardPanelY - boardPanelH / 2;
-          const boardTitleY = boardPanelTop + 36;
-          const boardCloseY = boardPanelTop + 18;
-          const boardCloseX = boardPanelX + boardPanelW / 2 - 18;
-          const boardListY = boardPanelTop + 68;
-          const boardWrapW = mobileBoard ? 172 : 110;
+          const boardPanelW = mobileBoard ? 272 : 248;
+          const boardPanelH = mobileBoard ? 248 : 228;
+          const boardPanelX = mobileBoard ? centerX : boardButtonX;
+          const boardPanelY = mobileBoard ? 328 : boardButtonY + boardButtonH / 2 + boardPanelH / 2 + 8;
+          const boardCloseX = boardPanelX + boardPanelW / 2 - 16;
+          const boardCloseY = boardPanelY - boardPanelH / 2 + 16;
           const volumeButtonX = mobileBoard ? 92 : 98;
           const volumeButtonY = boardButtonY;
           const volumeButtonW = mobileBoard ? 44 : 46;
@@ -1824,33 +2337,10 @@
           const trophyIconScale = mobileBoard ? 0.88 : 0.94;
           drawMenuTrophyIcon(this.trophyButtonIcon, trophyButtonX, trophyButtonY, trophyIconScale);
 
-          this.boardPanel = this.add.rectangle(boardPanelX, boardPanelY, boardPanelW, boardPanelH, COLORS.parchment, 0.97)
-            .setStrokeStyle(3, COLORS.ink, 0.5)
-            .setVisible(false);
-          this.boardPanelTitle = this.add.text(boardPanelX, boardTitleY, "OUTLAWS", {
-            fontFamily: "Georgia, serif",
-            fontSize: "15px",
-            fontStyle: "bold",
-            color: "#5E442C"
-          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setVisible(false);
-          this.boardCloseText = this.add.text(boardCloseX, boardCloseY, "x", {
-            fontFamily: "Georgia, serif",
-            fontSize: "18px",
-            fontStyle: "bold",
-            color: "#5E442C"
-          }).setOrigin(0.5).setStroke("#F4E4BC", 2).setVisible(false);
-          this.boardList = this.add.text(boardPanelX, boardListY, canUseOnlineLeaderboard() ? "Loading leaderboard..." : "Online board lives on the Vercel build.", {
-            fontFamily: "Georgia, serif",
-            fontSize: mobileBoard ? "14px" : "13px",
-            fontStyle: "italic",
-            color: "#6A513A",
-            align: "center",
-            lineSpacing: 4
-          }).setOrigin(0.5, 0).setStroke("#F4E4BC", 2).setWordWrapWidth(boardWrapW).setVisible(false);
-
-          this.boardButtonBounds = { x: boardButtonX, y: boardButtonY, w: boardButtonW, h: boardButtonH };
-          this.boardCloseBounds = { x: boardCloseX, y: boardCloseY, w: 24, h: 24 };
+          this.boardCloseBounds = { x: boardCloseX, y: boardCloseY, w: 28, h: 28 };
           this.boardPanelBounds = { x: boardPanelX, y: boardPanelY, w: boardPanelW, h: boardPanelH };
+          this.outlawPanelAnchor = mobileBoard ? "center" : "right";
+          this.boardButtonBounds = { x: boardButtonX, y: boardButtonY, w: boardButtonW, h: boardButtonH };
           this.boardOpen = false;
           this.volumeButtonBounds = { x: volumeButtonX, y: volumeButtonY, w: volumeButtonW, h: volumeButtonH };
           this.volumePanelBounds = { x: volumePanelX, y: volumePanelY, w: volumePanelW, h: volumePanelH };
@@ -2061,6 +2551,13 @@
               this.medalTrack.setColor(Phaser.Display.Color.IntegerToColor(getMedalDisplayColor(0)).rgba);
             }
             if (this.refreshTrophyPanel) this.refreshTrophyPanel();
+            if (this.refreshOutlawBoardPanel) {
+              if (canUseOnlineLeaderboard()) {
+                void this.loadLeaderboard();
+              } else {
+                this.refreshOutlawBoardPanel("offline", []);
+              }
+            }
           });
 
           // ── Trophy panel ───────────────────────────────────────────
@@ -2117,6 +2614,27 @@
           };
           this.refreshTrophyPanel();
 
+          const outlawBoard = buildOutlawBoardPanel();
+          this.domMenuOutlawPanel = outlawBoard.panel;
+          document.body.appendChild(this.domMenuOutlawPanel);
+          this.refreshOutlawBoardPanel = (state, entries) => {
+            renderOutlawBoardPanel(this.domMenuOutlawPanel, state, entries);
+          };
+          if (canUseOnlineLeaderboard()) {
+            this.refreshOutlawBoardPanel("loading", []);
+          } else {
+            this.refreshOutlawBoardPanel("offline", []);
+          }
+
+          outlawBoard.closeBtn.addEventListener("click", (e) => {
+            if (e && e.preventDefault) e.preventDefault();
+            this.setBoardOpen(false);
+            this.positionMenuDOMButtons();
+            if (this.domMenuBoardBtn) {
+              this.domMenuBoardBtn.focus();
+            }
+          });
+
           const start = (e) => {
             if (e && e.preventDefault) e.preventDefault();
             if (this.menuRequiresExplicitTilt) return;
@@ -2124,7 +2642,10 @@
           };
           const toggleBoard = (e) => {
             if (e && e.preventDefault) e.preventDefault();
-            this.setBoardOpen(!this.boardOpen);
+            const opening = !this.boardOpen;
+            if (opening && this.volumeOpen) this.setVolumeOpen(false);
+            if (opening && this.trophyOpen) this.setTrophyOpen(false);
+            this.setBoardOpen(opening);
             this.positionMenuDOMButtons();
             if (this.boardOpen && this.domMenuBoardCloseBtn) {
               this.domMenuBoardCloseBtn.focus();
@@ -2142,6 +2663,7 @@
             if (e && e.preventDefault) e.preventDefault();
             const opening = !this.volumeOpen;
             if (opening && this.trophyOpen) this.setTrophyOpen(false);
+            if (opening && this.boardOpen) this.setBoardOpen(false);
             this.setVolumeOpen(opening);
             if (opening && this.domMenuVolumeRange) {
               this.domMenuVolumeRange.value = String(Math.round((this.audio ? this.audio.getVolume() : DEFAULT_VOLUME) * 100));
@@ -2152,6 +2674,7 @@
             if (e && e.preventDefault) e.preventDefault();
             const opening = !this.trophyOpen;
             if (opening && this.volumeOpen) this.setVolumeOpen(false);
+            if (opening && this.boardOpen) this.setBoardOpen(false);
             if (opening && this.refreshTrophyPanel) this.refreshTrophyPanel();
             this.setTrophyOpen(opening);
           };
@@ -2238,11 +2761,15 @@
               this.domMenuTrophyPanel.style.display = "none";
             }
           }
-
-          if (this.boardOpen) {
-            place(this.domMenuBoardCloseBtn, this.boardCloseBounds);
-          } else {
-            this.domMenuBoardCloseBtn.style.display = "none";
+          if (this.domMenuOutlawPanel && this.boardPanelBounds) {
+            if (this.boardOpen) {
+              place(this.domMenuOutlawPanel, this.boardPanelBounds);
+              if (this.domMenuBoardCloseBtn && this.boardCloseBounds) {
+                place(this.domMenuBoardCloseBtn, this.boardCloseBounds);
+              }
+            } else if (this.domMenuBoardCloseBtn) {
+              this.domMenuBoardCloseBtn.style.display = "none";
+            }
           }
         }
 
@@ -2308,6 +2835,12 @@
           this.domMenuVolumeRange = null;
           if (this.domMenuTrophyBtn) { this.domMenuTrophyBtn.remove(); this.domMenuTrophyBtn = null; }
           if (this.domMenuTrophyPanel) { this.domMenuTrophyPanel.remove(); this.domMenuTrophyPanel = null; }
+          if (this.domMenuOutlawPanel) { this.domMenuOutlawPanel.remove(); this.domMenuOutlawPanel = null; }
+          this.refreshOutlawBoardPanel = null;
+          if (this.outlawPanelCloseTimer) {
+            clearTimeout(this.outlawPanelCloseTimer);
+            this.outlawPanelCloseTimer = null;
+          }
           this.refreshTrophyPanel = null;
           if (this.menuVolumeTapTimer) {
             clearTimeout(this.menuVolumeTapTimer);
@@ -2337,11 +2870,7 @@
             this.volumeButtonBox,
             this.volumeButtonIcon,
             this.trophyButtonBox,
-            this.trophyButtonIcon,
-            this.boardPanel,
-            this.boardPanelTitle,
-            this.boardCloseText,
-            this.boardList
+            this.trophyButtonIcon
           ].forEach((obj) => {
             if (obj && obj.destroy) {
               obj.destroy();
@@ -2365,25 +2894,63 @@
         }
 
         async loadLeaderboard() {
+          if (!this.refreshOutlawBoardPanel) {
+            return;
+          }
+          if (!canUseOnlineLeaderboard()) {
+            this.refreshOutlawBoardPanel("offline", []);
+            return;
+          }
+          this.refreshOutlawBoardPanel("loading", []);
           try {
             const response = await fetch("/api/leaderboard");
             if (!response.ok) {
               throw new Error(`Leaderboard returned ${response.status}`);
             }
             const data = await response.json();
-            this.boardList.setText(formatLeaderboardEntries(data.entries || []));
+            const entries = data.entries || [];
+            this.refreshOutlawBoardPanel(entries.length ? "ready" : "empty", entries);
           } catch (error) {
-            this.boardList.setText("Outlaw board unavailable right now.");
+            this.refreshOutlawBoardPanel("error", []);
           }
         }
 
         setBoardOpen(open) {
-          this.boardOpen = open;
-          const visible = !!open;
-          this.boardPanel.setVisible(visible);
-          this.boardPanelTitle.setVisible(visible);
-          this.boardCloseText.setVisible(visible);
-          this.boardList.setVisible(visible);
+          const nextOpen = !!open;
+          this.boardOpen = nextOpen;
+          if (this.outlawPanelCloseTimer) {
+            clearTimeout(this.outlawPanelCloseTimer);
+            this.outlawPanelCloseTimer = null;
+          }
+          if (nextOpen) {
+            if (this.volumeOpen) this.setVolumeOpen(false);
+            if (this.trophyOpen) this.setTrophyOpen(false);
+            if (canUseOnlineLeaderboard()) {
+              void this.loadLeaderboard();
+            } else if (this.refreshOutlawBoardPanel) {
+              this.refreshOutlawBoardPanel("offline", []);
+            }
+          }
+          if (this.domMenuOutlawPanel) {
+            this.domMenuOutlawPanel.classList.toggle("anchor-right", this.outlawPanelAnchor === "right");
+            this.domMenuOutlawPanel.classList.toggle("anchor-center", this.outlawPanelAnchor === "center");
+            if (nextOpen) {
+              this.domMenuOutlawPanel.style.display = "block";
+              requestAnimationFrame(() => {
+                if (this.boardOpen && this.domMenuOutlawPanel) {
+                  this.domMenuOutlawPanel.classList.add("is-open");
+                }
+              });
+            } else {
+              this.domMenuOutlawPanel.classList.remove("is-open");
+              this.outlawPanelCloseTimer = setTimeout(() => {
+                if (!this.boardOpen && this.domMenuOutlawPanel) {
+                  this.domMenuOutlawPanel.style.display = "none";
+                }
+                this.outlawPanelCloseTimer = null;
+              }, 170);
+            }
+          }
           if (this.positionMenuDOMButtons) {
             this.positionMenuDOMButtons();
           }
@@ -3236,6 +3803,7 @@
           backdrop.style.pointerEvents = "auto";
 
           const root = document.createElement("div");
+          root.className = "outlaw-name-prompt";
           root.style.position = "fixed";
           root.style.left = "50%";
           root.style.top = "50%";
@@ -3271,6 +3839,7 @@
           close.style.cursor = "pointer";
 
           const title = document.createElement("div");
+          title.className = "outlaw-name-prompt-title";
           title.textContent = "OUTLAW NAME";
           title.style.fontSize = "18px";
           title.style.fontWeight = "700";
@@ -5169,8 +5738,16 @@
             await this.submitLeaderboardScore(handle, this.pendingLeaderboardScore);
             localStorage.setItem(LEADERBOARD_HANDLE_KEY, handle);
             this.pendingLeaderboardScore = 0;
-            this.setLeaderboardSubmitVisible(false);
             this.hideLeaderboardNamePrompt();
+            if (this.submitBoardText) {
+              this.submitBoardText.setText("POSTED TO THE OUTLAW BOARD!");
+              this.submitBoardText.setColor("#B83020");
+              this.submitBoardText.setVisible(true);
+            }
+            if (this.submitBoardHit) {
+              this.submitBoardHit.setVisible(false);
+              this.submitBoardHit.input.enabled = false;
+            }
             this.revealGameOverOverlay();
           } catch (error) {
             if (this.leaderboardPromptMessage) {
