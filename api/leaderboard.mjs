@@ -54,17 +54,21 @@ async function readRawEntries() {
     withScores: true
   });
 
-  // The SDK returns a flat [member, score, member, score, ...] array.
-  // parseRecursive may have already deserialized JSON string members into objects,
-  // so we re-serialize them back to strings before passing to parseEntry.
+  // SDK v1.x returns { member, score }[] with withScores: true.
+  // Re-serialize object members back to strings before passing to parseEntry.
   const entries = [];
-  for (let i = 0; i + 1 < raw.length; i += 2) {
-    const rawMember = raw[i];
+  for (const item of raw) {
+    const rawMember = (item !== null && typeof item === "object" && "member" in item)
+      ? item.member
+      : item;
+    const score = (item !== null && typeof item === "object" && "score" in item)
+      ? Number(item.score)
+      : 0;
     const member =
       typeof rawMember === "object" && rawMember !== null
         ? JSON.stringify(rawMember)
         : String(rawMember ?? "");
-    entries.push({ member, score: Number(raw[i + 1]) || 0 });
+    entries.push({ member, score });
   }
   return entries.map(parseEntry);
 }
