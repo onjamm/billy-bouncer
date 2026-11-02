@@ -4,12 +4,12 @@ const LEADERBOARD_KEY = "billy-bouncer:leaderboard";
 const MAX_DISPLAY_ENTRIES = 3;
 const MAX_SCAN_ENTRIES = 100;
 
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+
 const redis =
-  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
-    ? new Redis({
-        url: process.env.KV_REST_API_URL,
-        token: process.env.KV_REST_API_TOKEN
-      })
+  redisUrl && redisToken
+    ? new Redis({ url: redisUrl, token: redisToken })
     : null;
 
 function setCors(response) {
