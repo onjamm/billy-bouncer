@@ -905,7 +905,7 @@
       // Applies while active and for a short grace period after it ends.
       const POWERUP_SELF_COOLDOWN_MS = 6500;
       const POWERUP_PITY_ALTITUDE_GAP = 450;
-      const GOONER_LINES = [
+      const GONER_LINES = [
         "The law caught up eventually...",
         "Billy zigged when he should've zagged.",
         "That bounty just got easier to collect.",
@@ -920,16 +920,16 @@
         "Somewhere, a sheriff nodded knowingly.",
         "That jump looked better on paper.",
         "The canyon keeps what it catches.",
-        "A bold climb, a questionable ending.",
+        "A bold climb, a brief ending.",
         "Turns out gravity still works out here.",
         "The saloon will hear about this one.",
         "That swagger outran Billy's boots.",
-        "Accidental justice still counts, sadly.",
+        "The frontier has a long memory.",
         "Billy picked the one route marked nope.",
-        "That landing had bar-fight grace.",
+        "Style points don't survive the fall.",
         "The posse won't need to break a sweat.",
         "A clean getaway became a messy footnote.",
-        "The desert called. Billy answered badly.",
+        "The desert takes what it's owed.",
         "Somewhere up there, a platform laughed.",
         "A fine time to discover consequences."
       ];
@@ -3555,7 +3555,7 @@
                 return "GONER!";
               }
             } catch (error) {}
-            return Math.random() < 0.5 ? "GONER!" : "GOONER!";
+            return "GONER!";
           };
           this.gameOverTitleText = chooseGameOverTitle();
 
@@ -3575,7 +3575,7 @@
           }).setOrigin(0.5);
           this.gameOverTitle = goner;
           this.gameOverTitleShadow = gonerShadow;
-          this.gameOverLine = this.add.text(cx, GAME_OVER_LINE_Y, GOONER_LINES[0], {
+          this.gameOverLine = this.add.text(cx, GAME_OVER_LINE_Y, GONER_LINES[0], {
             fontFamily: "Georgia, serif",
             fontSize: "24px",
             fontStyle: "italic",
@@ -3985,15 +3985,15 @@
         }
 
         getRandomGameOverLine() {
-          if (GOONER_LINES.length === 1) {
-            return GOONER_LINES[0];
+          if (GONER_LINES.length === 1) {
+            return GONER_LINES[0];
           }
-          let index = Phaser.Math.Between(0, GOONER_LINES.length - 1);
+          let index = Phaser.Math.Between(0, GONER_LINES.length - 1);
           if (index === this.lastGameOverLineIndex) {
-            index = (index + 1 + Phaser.Math.Between(0, GOONER_LINES.length - 2)) % GOONER_LINES.length;
+            index = (index + 1 + Phaser.Math.Between(0, GONER_LINES.length - 2)) % GONER_LINES.length;
           }
           this.lastGameOverLineIndex = index;
-          return GOONER_LINES[index];
+          return GONER_LINES[index];
         }
 
         handleOverlayPointer(pointer) {
@@ -5796,7 +5796,7 @@
           this.audio.stopAll();
           this.audio.gameOver();
 
-          // Title: first ever death shows "GONER!", subsequent deaths randomize between GONER/GOONER.
+          // Title: first ever death shows "GONER!", subsequent deaths also show "GONER!".
           const title = (() => {
             try {
               const seen = localStorage.getItem(GAME_OVER_TITLE_SEEN_KEY) === "1";
@@ -5805,7 +5805,7 @@
                 return "GONER!";
               }
             } catch (error) {}
-            return Math.random() < 0.5 ? "GONER!" : "GOONER!";
+            return "GONER!";
           })();
           this.gameOverTitleText = title;
           if (this.gameOverTitle) this.gameOverTitle.setText(title);
